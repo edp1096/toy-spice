@@ -1,4 +1,4 @@
-* RL Transient Test with Sine Input
+* RL Test
 .tran 0.1m 3ms
 Vin 1 0 SIN(0 5 1k)
 *.op

@@ -1,4 +1,4 @@
-* RC Transient Test
+* RC Test
 *.tran 0.1ms 3ms
 *vin 1 0 sin(0 5 1k)
 *.op
