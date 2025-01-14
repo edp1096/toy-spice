@@ -27,6 +27,7 @@ type TimeDependent interface {
 type NonLinear interface {
 	LoadConductance(matrix matrix.DeviceMatrix) error
 	LoadCurrent(matrix matrix.DeviceMatrix) error
+	UpdateVoltages(voltages []float64) error
 }
 
 type BaseDevice struct {

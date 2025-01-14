@@ -155,6 +155,16 @@ func (tr *Transient) doNRiter(gmin float64, maxIter int) error {
 
 	for iter := 0; iter < maxIter; iter++ {
 		mat.Clear()
+
+		// 이전 해로 비선형 소자들의 전압 업데이트
+		if iter > 0 {
+			if solution := mat.Solution(); solution != nil {
+				if err := ckt.UpdateNonlinearVoltages(solution); err != nil {
+					return fmt.Errorf("updating nonlinear voltages: %v", err)
+				}
+			}
+		}
+
 		if err := ckt.Stamp(cktStatus); err != nil {
 			return fmt.Errorf("stamping error: %v", err)
 		}

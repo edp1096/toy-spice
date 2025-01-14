@@ -199,7 +199,16 @@ func parseElement(line string) (*Element, error) {
 		return parseVoltageSource(fields)
 	}
 
-	// Parts
+	if elem.Type == "D" {
+		elem.Nodes = fields[1:3] // 노드 2개만 가져오기
+		if len(fields) > 3 {
+			// 나중에 파라미터 처리를 위해 저장
+			elem.Params["model"] = fields[3]
+		}
+		return elem, nil
+	}
+
+	// Parts - RLC..
 	elem.Nodes = fields[1 : len(fields)-1]
 	valueStr := fields[len(fields)-1]
 	value, err := ParseValue(valueStr)
@@ -224,6 +233,8 @@ func parseVoltageSource(fields []string) (*Element, error) {
 	}
 
 	remaining := strings.Join(fields[3:], " ")
+	remaining = strings.ReplaceAll(remaining, "(", " ( ") // Append whitespace around parentheses
+	remaining = strings.ReplaceAll(remaining, ")", " ) ")
 	words := strings.Fields(remaining)
 	if len(words) == 0 {
 		return nil, fmt.Errorf("missing voltage source type")
@@ -304,6 +315,8 @@ func CreateDevice(elem Element, nodeMap map[string]int) (device.Device, error) {
 		return device.NewInductor(elem.Name, elem.Nodes, elem.Value), nil
 	case "C":
 		return device.NewCapacitor(elem.Name, elem.Nodes, elem.Value), nil
+	case "D":
+		return device.NewDiode(elem.Name, elem.Nodes), nil
 	case "V":
 		switch elem.Params["type"] {
 		case "dc":

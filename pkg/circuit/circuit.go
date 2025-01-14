@@ -8,17 +8,18 @@ import (
 )
 
 type Circuit struct {
-	name         string
-	nodeMap      map[string]int
-	branchMap    map[string]int
-	devices      []device.Device
-	numNodes     int
-	matrix       *matrix.CircuitMatrix
-	Status       *device.CircuitStatus
-	Time         float64
-	timeStep     float64
-	isComplex    bool
-	prevSolution map[string]float64
+	name             string
+	nodeMap          map[string]int
+	branchMap        map[string]int
+	devices          []device.Device
+	numNodes         int
+	matrix           *matrix.CircuitMatrix
+	Status           *device.CircuitStatus
+	Time             float64
+	timeStep         float64
+	isComplex        bool
+	prevSolution     map[string]float64
+	nonlinearDevices []device.NonLinear
 }
 
 func New(name string) *Circuit {
@@ -85,9 +86,12 @@ func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 		}
 		dev.SetNodes(nodeIndices)
 
-		// Branch index for voltage source
 		if v, ok := dev.(*device.VoltageSource); ok {
 			v.SetBranchIndex(c.branchMap[elem.Name])
+		}
+
+		if nl, ok := dev.(device.NonLinear); ok {
+			c.nonlinearDevices = append(c.nonlinearDevices, nl)
 		}
 
 		c.devices = append(c.devices, dev)
@@ -213,4 +217,13 @@ func (c *Circuit) GetNodeVoltage(nodeIdx int) float64 {
 	}
 
 	return solution[nodeIdx]
+}
+
+func (c *Circuit) UpdateNonlinearVoltages(solution []float64) error {
+	for _, dev := range c.nonlinearDevices {
+		if err := dev.UpdateVoltages(solution); err != nil {
+			return fmt.Errorf("updating voltages: %v", err)
+		}
+	}
+	return nil
 }
