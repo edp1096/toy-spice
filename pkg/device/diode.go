@@ -83,7 +83,7 @@ func (d *Diode) thermalVoltage(temp float64) float64 {
 }
 
 // Bias current
-func (d *Diode) calculateCurrent(vd float64, vt float64) float64 {
+func (d *Diode) calculateCurrentNotUse(vd float64, vt float64) float64 {
 	// Forward bias
 	if vd >= -5*vt {
 		expArg := vd / (d.N * vt)
@@ -103,18 +103,47 @@ func (d *Diode) calculateCurrent(vd float64, vt float64) float64 {
 	return -d.Is
 }
 
-// Conductance
-func (d *Diode) calculateConductance(vd, id float64, vt float64) float64 {
-	// Forward bias
-	if vd >= -5*vt {
-		return (id+d.Is)/(d.N*vt) + d.Gmin
+// Compute temperature-dependent Is
+func (d *Diode) temperatureAdjustedIs(temp float64) float64 {
+	const REFTEMP = 300.15 // 27°C
+	vt := d.thermalVoltage(temp)
+
+	// SPICE3F5 formula: is(T2) = is(T1) * (T2/T1)^(XTI/N) * exp(-(Eg/(2*k))*(1/T2 - 1/T1))
+	ratio := temp / REFTEMP
+	egfact := -d.Eg / (2 * vt) * (temp/REFTEMP - 1.0)
+
+	return d.Is * math.Pow(ratio, d.Xti/d.N) * math.Exp(egfact)
+}
+
+func (d *Diode) calculateCurrent(vd, temp float64) float64 {
+	vt := d.thermalVoltage(temp)
+	nvt := d.N * vt
+
+	// Forward bias and weak reverse bias
+	if vd > -3.0*nvt {
+		arg := vd / (nvt)
+		if arg > 40.0 {
+			arg = 40.0
+		}
+		evd := math.Exp(arg)
+		is_t := d.temperatureAdjustedIs(temp)
+		return is_t * (evd - 1.0)
 	}
 
-	// Reverse bias
-	if vd < -d.Bv {
-		return d.Is/vt + d.Gmin
+	// Strong reverse bias - SPICE3F5는 단순히 -Is를 반환
+	return -d.temperatureAdjustedIs(temp)
+}
+
+func (d *Diode) calculateConductance(vd, id, temp float64) float64 {
+	vt := d.thermalVoltage(temp)
+	nvt := d.N * vt
+
+	// Forward bias and weak reverse bias
+	if vd > -3.0*nvt {
+		return (math.Abs(id)+d.temperatureAdjustedIs(temp))/nvt + d.Gmin
 	}
 
+	// Strong reverse bias
 	return d.Gmin
 }
 
@@ -136,6 +165,21 @@ func (d *Diode) calculateJunctionCap(vd float64) float64 {
 	return d.Cj0 * (1 + d.M*vd/d.Vj)
 }
 
+func (d *Diode) diffusionCapacitance(vd float64, temp float64, timeStep float64) float64 {
+	if d.Tt == 0.0 || timeStep == 0.0 {
+		return 0.0
+	}
+
+	// 현재 전류
+	id := d.calculateCurrent(vd, temp)
+
+	// dI/dt 계산 (전류 시간 미분)
+	didt := (id - d.idOld) / timeStep
+
+	// Transit Time capacitance: Cd = Tt * dI/dt
+	return d.Tt * didt
+}
+
 // Stamp for OP/Transient
 func (d *Diode) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 	if status.Mode == ACAnalysis {
@@ -148,9 +192,19 @@ func (d *Diode) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 
 	n1, n2 := d.Nodes[0], d.Nodes[1]
 
-	vt := d.thermalVoltage(status.Temp)
-	d.id = d.calculateCurrent(d.vd, vt)
-	d.gd = d.calculateConductance(d.vd, d.id, vt)
+	// vt := d.thermalVoltage(status.Temp)
+	// d.id = d.calculateCurrent(d.vd, vt)
+	// d.gd = d.calculateConductance(d.vd, d.id, vt)
+	d.id = d.calculateCurrent(d.vd, status.Temp)
+	d.gd = d.calculateConductance(d.vd, d.id, status.Temp)
+
+	// Diffusion capacitance
+	if status.Mode == TransientAnalysis && status.TimeStep > 0 {
+		cd := d.diffusionCapacitance(d.vd, status.Temp, status.TimeStep)
+		// Add capacitive current to total current
+		d.capCurrent = cd * (d.vd - d.vdOld) / status.TimeStep
+		d.id += d.capCurrent
+	}
 
 	if n1 != 0 {
 		matrix.AddElement(n1, n1, d.gd)
@@ -239,7 +293,9 @@ func (d *Diode) LoadCurrent(matrix matrix.DeviceMatrix) error {
 func (d *Diode) SetTimeStep(dt float64) {}
 
 func (d *Diode) UpdateState(voltages []float64, status *CircuitStatus) {
-	d.vdOld, d.idOld = d.vd, d.id
+	d.vdOld = d.vd
+	d.idOld = d.id - d.capCurrent // Store DC current only
+	d.capCurrent = 0.0
 }
 
 func (d *Diode) CalculateLTE(voltages map[string]float64, status *CircuitStatus) float64 {

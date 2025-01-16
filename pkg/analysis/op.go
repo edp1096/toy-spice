@@ -26,8 +26,9 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 	var oldSolution []float64
 	cktStatus := &device.CircuitStatus{
 		Time: 0,
-		Gmin: gmin,
 		Mode: device.OperatingPointAnalysis,
+		Temp: 300.15, // 27 = 300.15K
+		Gmin: gmin,
 	}
 
 	for iter := 0; iter < maxIter; iter++ {

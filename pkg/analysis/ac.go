@@ -52,6 +52,7 @@ func (ac *ACAnalysis) Execute() error {
 		ac.Circuit.Status = &device.CircuitStatus{
 			Frequency: freq,
 			Mode:      device.ACAnalysis,
+			Temp:      300.15, // 27 = 300.15K
 		}
 
 		mat := ac.Circuit.GetMatrix()

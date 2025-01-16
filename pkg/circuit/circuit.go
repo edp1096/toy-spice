@@ -133,6 +133,7 @@ func (c *Circuit) Update() {
 		TimeStep: c.timeStep,
 		Gmin:     1e-12,
 		Mode:     device.TransientAnalysis,
+		Temp:     300.15, // 27 = 300.15K
 	}
 
 	for _, dev := range c.devices {

@@ -74,13 +74,12 @@ func (tr *Transient) Execute() error {
 			tr.timeStep = nextTime - tr.time
 		}
 
-		// 상태 설정
 		status := &device.CircuitStatus{
 			Time:     tr.time,
 			TimeStep: tr.timeStep,
 			Mode:     device.TransientAnalysis,
 			Method:   tr.order,
-			Temp:     300.0, // 기본 온도
+			Temp:     300.15, // 27 = 300.15K
 			Gmin:     tr.convergence.gmin,
 		}
 		tr.Circuit.Status = status
@@ -134,9 +133,10 @@ func (tr *Transient) doNRiter(gmin float64, maxIter int) error {
 	cktStatus := &device.CircuitStatus{
 		Time:     tr.time,
 		TimeStep: tr.timeStep,
-		Gmin:     gmin,
 		Mode:     device.TransientAnalysis,
 		Method:   tr.order, // BE or TR
+		Temp:     300.15,   // 27 = 300.15K
+		Gmin:     gmin,
 	}
 
 	for iter := 0; iter < maxIter; iter++ {
