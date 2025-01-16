@@ -18,6 +18,12 @@ type Diode struct {
 	Bv   float64 // Breakdown voltage
 	Gmin float64 // Minimum Conductance
 
+	// Temperature parameters
+	Eg  float64 // Energy Gap (eV)
+	Xti float64 // Saturation current temperature exponent
+	Tt  float64 // Transit time
+	Fc  float64 // Forward-bias depletion capacitance coefficient
+
 	// Internal states for Operating Point
 	vd float64 // Voltage
 	id float64 // Current
@@ -56,15 +62,24 @@ func (d *Diode) setDefaultParameters() {
 	d.Vj = 1.0     // Built-in Potential 접합 전위
 	d.Bv = 100.0   // Breakdown voltage
 	d.Gmin = 1e-12 // Minimum Conductance
+
+	d.Eg = 1.11 // Silicon bandgap
+	d.Xti = 3.0 // Saturation current temp. exp
+	d.Tt = 0.0  // Transit time
+	d.Fc = 0.5  // Forward-bias depletion capacitance coefficient
 }
 
 func (d *Diode) thermalVoltage(temp float64) float64 {
+	const (
+		CHARGE    = 1.6021918e-19 // 전자 전하량 (C)
+		BOLTZMANN = 1.3806226e-23 // 볼츠만 상수 (J/K)
+	)
+
 	if temp <= 0 {
-		temp = 300 // Default: room temperature. 300K
+		temp = 300.15 // 절대온도 (K)
 	}
 
-	// VT = kT/q ≈ (0.026/300) * T
-	return (0.026 / 300.0) * temp
+	return BOLTZMANN * temp / CHARGE
 }
 
 // Bias current
@@ -84,6 +99,7 @@ func (d *Diode) calculateCurrent(vd float64, vt float64) float64 {
 	if vd < -d.Bv {
 		return -d.Is * (1 + (vd+d.Bv)/vt)
 	}
+
 	return -d.Is
 }
 
@@ -122,13 +138,17 @@ func (d *Diode) calculateJunctionCap(vd float64) float64 {
 
 // Stamp for OP/Transient
 func (d *Diode) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
+	if status.Mode == ACAnalysis {
+		return d.StampAC(matrix, status)
+	}
+
 	if len(d.Nodes) != 2 {
 		return fmt.Errorf("diode %s: requires exactly 2 nodes", d.Name)
 	}
 
 	n1, n2 := d.Nodes[0], d.Nodes[1]
-	vt := d.thermalVoltage(status.Temp)
 
+	vt := d.thermalVoltage(status.Temp)
 	d.id = d.calculateCurrent(d.vd, vt)
 	d.gd = d.calculateConductance(d.vd, d.id, vt)
 
@@ -193,7 +213,6 @@ func (d *Diode) LoadConductance(matrix matrix.DeviceMatrix) error {
 			matrix.AddElement(n1, n2, -d.gd)
 		}
 	}
-
 	if n2 != 0 {
 		if n1 != 0 {
 			matrix.AddElement(n2, n1, -d.gd)
@@ -235,7 +254,6 @@ func (d *Diode) UpdateVoltages(voltages []float64) error {
 	n1, n2 := d.Nodes[0], d.Nodes[1]
 	var v1, v2 float64
 
-	// Node voltage
 	if n1 != 0 {
 		v1 = voltages[n1]
 	}
@@ -243,7 +261,6 @@ func (d *Diode) UpdateVoltages(voltages []float64) error {
 		v2 = voltages[n2]
 	}
 
-	// Diode voltage
 	d.vd = v1 - v2
 	return nil
 }

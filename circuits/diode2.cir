@@ -1,5 +1,5 @@
 * Diode Test Circuit. Half wave rectifier
 .tran 0.1ms 3ms
 vin 1 0 sin(0 5 1k)
-d1 1 2 default
+d1 1 2 D
 r1 2 0 1k

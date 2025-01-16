@@ -30,7 +30,6 @@ func NewTransient(tStart, tStop, tStep, tMax float64, uic bool) *Transient {
 	if tMax == 0 {
 		tMax = tStep
 	}
-
 	return &Transient{
 		BaseAnalysis: *NewBaseAnalysis(),
 		op:           NewOP(),
@@ -41,8 +40,8 @@ func NewTransient(tStart, tStop, tStep, tMax float64, uic bool) *Transient {
 		minStep:      minStep,
 		useUIC:       uic,
 		time:         0,
-		order:        1, // BE
-		trtol:        7.0,
+		order:        1,   // BE
+		trtol:        7.0, // SPICE3F5 default
 		firstTime:    true,
 	}
 }
@@ -73,68 +72,55 @@ func (tr *Transient) Execute() error {
 		if nextTime > tr.stopTime {
 			nextTime = tr.stopTime
 			tr.timeStep = nextTime - tr.time
-			if tr.timeStep < tr.minStep {
-				tr.timeStep = tr.minStep
-			}
 		}
 
-		for {
-			tr.Circuit.Status = &device.CircuitStatus{
-				Time:     tr.time,
-				TimeStep: tr.timeStep,
-				Mode:     device.TransientAnalysis,
-				Method:   tr.order,
-			}
-			tr.Circuit.SetTimeStep(tr.timeStep)
+		// 상태 설정
+		status := &device.CircuitStatus{
+			Time:     tr.time,
+			TimeStep: tr.timeStep,
+			Mode:     device.TransientAnalysis,
+			Method:   tr.order,
+			Temp:     300.0, // 기본 온도
+			Gmin:     tr.convergence.gmin,
+		}
+		tr.Circuit.Status = status
 
-			err := tr.doNRiter(0, tr.convergence.maxIter)
-			if err != nil {
-				if tr.timeStep > tr.minStep {
-					tr.timeStep /= 2
-					continue
-				}
-				return fmt.Errorf("failed to converge at t=%g", tr.time)
-			}
+		// Gmin stepping을 사용한 해 탐색
+		gminValues := []float64{1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, tr.convergence.gmin}
+		solved := false
 
-			if tr.firstTime {
-				tr.firstTime = false
-				tr.order = 2 // TR
-				tol := tr.calculateTruncError()
-				if tol > tr.trtol {
-					tr.order = 1 // Change to BE if LTE is larger than tolerance
-				}
+		for _, gmin := range gminValues {
+			status.Gmin = gmin
+			err := tr.doNRiter(gmin, tr.convergence.maxIter)
+			if err == nil {
+				solved = true
 				break
 			}
-
-			if tr.order == 2 { // TR
-				tol := tr.calculateTruncError()
-				if tol >= 1.0 {
-					tr.order = 1 // BE
-					if tr.timeStep > tr.minStep {
-						oldStep := tr.timeStep
-						tr.timeStep /= 8
-						if tr.timeStep < tr.minStep {
-							tr.timeStep = oldStep / 2
-						}
-						continue
-					}
-				}
-			}
-			break
 		}
 
+		if !solved {
+			if tr.timeStep > tr.minStep {
+				tr.timeStep /= 2
+				continue
+			}
+			return fmt.Errorf("failed to converge at t=%g", tr.time)
+		}
+
+		// 해를 찾은 경우
 		tr.Circuit.Update()
 		tr.time = nextTime
 		if tr.time >= tr.startTime {
 			tr.StoreTimeResult(tr.time, tr.Circuit.GetSolution())
 		}
 
-		if tr.time < tr.stopTime && tr.timeStep < tr.maxStep {
-			tr.timeStep *= 1.2
-			if tr.timeStep > tr.maxStep {
-				tr.timeStep = tr.maxStep
+		// 다음 스텝 준비
+		if tr.time < tr.stopTime {
+			if tr.timeStep < tr.maxStep {
+				tr.timeStep *= 1.1 // 좀 더 보수적인 증가율
+				if tr.timeStep > tr.maxStep {
+					tr.timeStep = tr.maxStep
+				}
 			}
-			tr.order = 2 // TR
 		}
 	}
 

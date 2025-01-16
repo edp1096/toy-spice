@@ -128,7 +128,6 @@ func (v *VoltageSource) GetVoltage(t float64) float64 {
 func (v *VoltageSource) GetType() string { return "V" }
 
 func (v *VoltageSource) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
-	// AC 분석인 경우 StampAC 호출
 	if status.Mode == ACAnalysis {
 		return v.StampAC(matrix, status)
 	}

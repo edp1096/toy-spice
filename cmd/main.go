@@ -93,18 +93,33 @@ func printResults(results map[string][]float64) {
 	fmt.Printf("\nTransient Analysis Results (%d time points):\n", len(times))
 	fmt.Println("Time        Node Voltages        Branch Currents")
 	fmt.Println("------------------------------------------------")
+
+	var voltageNames, currentNames []string
+	for name := range results {
+		if name == "TIME" {
+			continue
+		}
+		if strings.HasPrefix(name, "V(") {
+			voltageNames = append(voltageNames, name)
+		} else if strings.HasPrefix(name, "I(") {
+			currentNames = append(currentNames, name)
+		}
+	}
+	sort.Strings(voltageNames)
+	sort.Strings(currentNames)
+
 	for i, t := range times {
 		fmt.Printf("%9s  ", util.FormatValueFactor(t, "s"))
 
 		// Node voltage
-		for name, values := range results {
-			if strings.HasPrefix(name, "V(") {
+		for _, name := range voltageNames {
+			if values, ok := results[name]; ok {
 				fmt.Printf("%s=%s  ", name, util.FormatValueFactor(values[i], "V"))
 			}
 		}
 		// Branch current
-		for name, values := range results {
-			if strings.HasPrefix(name, "I(") {
+		for _, name := range currentNames {
+			if values, ok := results[name]; ok {
 				fmt.Printf("%s=%s  ", name, util.FormatValueFactor(values[i], "A"))
 			}
 		}
