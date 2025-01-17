@@ -1,0 +1,5 @@
+* vpulse test circuit
+Vpulse n1 0 PULSE(0 5 2ms 0.5ms 0.5ms 5ms 10ms)
+R1 n1 0 1k
+
+.tran 0.1ms 30ms

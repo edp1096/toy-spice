@@ -288,6 +288,18 @@ func parseVoltageSource(fields []string) (*Element, error) {
 		sinParams = strings.Trim(sinParams, "() ")
 		elem.Params["sin"] = sinParams
 
+	case "PULSE":
+		elem.Params["type"] = "pulse"
+		pulseParams := strings.Join(words[1:], " ")
+		pulseParams = strings.Trim(pulseParams, "() ")
+		elem.Params["pulse"] = pulseParams
+
+	case "PWL":
+		elem.Params["type"] = "pwl"
+		pwlParams := strings.Join(words[1:], " ")
+		pwlParams = strings.Trim(pwlParams, "() ")
+		elem.Params["pwl"] = pwlParams
+
 	case "AC":
 		if len(words) < 2 {
 			return nil, fmt.Errorf("missing AC magnitude")
@@ -357,6 +369,18 @@ func CreateDevice(elem Element, nodeMap map[string]int) (device.Device, error) {
 				return nil, err
 			}
 			return device.NewSinVoltageSource(elem.Name, elem.Nodes, offset, amplitude, freq, phase), nil
+		case "pulse":
+			v1, v2, delay, rise, fall, pWidth, period, err := parsePulseParams(elem.Params["pulse"])
+			if err != nil {
+				return nil, err
+			}
+			return device.NewPulseVoltageSource(elem.Name, elem.Nodes, v1, v2, delay, rise, fall, pWidth, period), nil
+		case "pwl":
+			times, values, err := parsePWLParams(elem.Params["pwl"])
+			if err != nil {
+				return nil, err
+			}
+			return device.NewPWLVoltageSource(elem.Name, elem.Nodes, times, values), nil
 		case "ac":
 			phase, err := ParseValue(elem.Params["phase"])
 			if err != nil {
@@ -400,4 +424,76 @@ func parseSinParams(params string) (offset, amplitude, freq, phase float64, err 
 	}
 
 	return offset, amplitude, freq, phase, nil
+}
+
+func parsePulseParams(params string) (v1, v2, delay, rise, fall, pWidth, period float64, err error) {
+	pulseParams := strings.Fields(params)
+	if len(pulseParams) < 7 {
+		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("insufficient PULSE parameters")
+	}
+
+	// V1 - Initial value
+	if v1, err = ParseValue(pulseParams[0]); err != nil {
+		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE V1: %v", err)
+	}
+
+	// V2 - Pulsed value
+	if v2, err = ParseValue(pulseParams[1]); err != nil {
+		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE V2: %v", err)
+	}
+
+	// Delay time
+	if delay, err = ParseValue(pulseParams[2]); err != nil {
+		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE delay: %v", err)
+	}
+
+	// Rise time
+	if rise, err = ParseValue(pulseParams[3]); err != nil {
+		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE rise: %v", err)
+	}
+
+	// Fall time
+	if fall, err = ParseValue(pulseParams[4]); err != nil {
+		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE fall: %v", err)
+	}
+
+	// Pulse width
+	if pWidth, err = ParseValue(pulseParams[5]); err != nil {
+		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE width: %v", err)
+	}
+
+	// Period
+	if period, err = ParseValue(pulseParams[6]); err != nil {
+		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE period: %v", err)
+	}
+
+	return v1, v2, delay, rise, fall, pWidth, period, nil
+}
+
+func parsePWLParams(params string) (times []float64, values []float64, err error) {
+	pwlParams := strings.Fields(params)
+	if len(pwlParams) < 4 || len(pwlParams)%2 != 0 {
+		return nil, nil, fmt.Errorf("insufficient or invalid PWL parameters, need pairs of time-value")
+	}
+
+	numPoints := len(pwlParams) / 2
+	times = make([]float64, numPoints)
+	values = make([]float64, numPoints)
+
+	for i := 0; i < numPoints; i++ {
+		// Time point
+		if times[i], err = ParseValue(pwlParams[2*i]); err != nil {
+			return nil, nil, fmt.Errorf("invalid PWL time[%d]: %v", i, err)
+		}
+		// Value point
+		if values[i], err = ParseValue(pwlParams[2*i+1]); err != nil {
+			return nil, nil, fmt.Errorf("invalid PWL value[%d]: %v", i, err)
+		}
+		// 시간은 단조 증가해야 함
+		if i > 0 && times[i] <= times[i-1] {
+			return nil, nil, fmt.Errorf("PWL time points must be strictly increasing")
+		}
+	}
+
+	return times, values, nil
 }

@@ -75,6 +75,39 @@ func NewSinVoltageSource(name string, nodeNames []string, offset, amplitude, fre
 	}
 }
 
+func NewPulseVoltageSource(name string, nodeNames []string, v1, v2, delay, rise, fall, pWidth, period float64) *VoltageSource {
+	return &VoltageSource{
+		BaseDevice: BaseDevice{
+			Name:      name,
+			Nodes:     make([]int, len(nodeNames)),
+			NodeNames: nodeNames,
+			Value:     v1,
+		},
+		vtype:  PULSE,
+		v1:     v1,
+		v2:     v2,
+		delay:  delay,
+		rise:   rise,
+		fall:   fall,
+		pWidth: pWidth,
+		period: period,
+	}
+}
+
+func NewPWLVoltageSource(name string, nodeNames []string, times []float64, values []float64) *VoltageSource {
+	return &VoltageSource{
+		BaseDevice: BaseDevice{
+			Name:      name,
+			Nodes:     make([]int, len(nodeNames)),
+			NodeNames: nodeNames,
+			Value:     values[0], // 첫 번째 값을 초기값으로
+		},
+		vtype:  PWL,
+		times:  times,
+		values: values,
+	}
+}
+
 func NewACVoltageSource(name string, nodeNames []string, dcValue, acMag, acPhase float64) *VoltageSource {
 	return &VoltageSource{
 		BaseDevice: BaseDevice{
@@ -98,9 +131,9 @@ func (v *VoltageSource) GetVoltage(t float64) float64 {
 		phaseRad := v.phase * math.Pi / 180.0
 		return v.dcValue + v.amplitude*math.Sin(2.0*math.Pi*v.freq*t+phaseRad)
 	case PULSE:
-		return v.getPulseVoltage()
+		return v.getPulseVoltage(t)
 	case PWL:
-		return v.getPWLVoltage()
+		return v.getPWLVoltage(t)
 	default:
 		return 0
 	}
@@ -154,14 +187,69 @@ func (v *VoltageSource) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatu
 	return nil
 }
 
-func (v *VoltageSource) getPulseVoltage() float64 {
-	// PULSE는 나중에
+func (v *VoltageSource) getPulseVoltage(t float64) float64 {
+	// Delay 이전에는 v1
+	if t < v.delay {
+		return v.v1
+	}
+
+	// 주기내 상대 시간 계산
+	t = t - v.delay
+	if v.period > 0 {
+		t = math.Mod(t, v.period)
+	}
+
+	// Rise 구간
+	if t < v.rise {
+		if v.rise == 0 {
+			return v.v2
+		}
+		return v.v1 + (v.v2-v.v1)*t/v.rise
+	}
+
+	// Pulse width 구간
+	if t < v.rise+v.pWidth {
+		return v.v2
+	}
+
+	// Fall 구간
+	fallStart := v.rise + v.pWidth
+	if t < fallStart+v.fall {
+		if v.fall == 0 {
+			return v.v1
+		}
+		return v.v2 - (v.v2-v.v1)*(t-fallStart)/v.fall
+	}
+
+	// 나머지 구간은 v1
 	return v.v1
 }
 
-func (v *VoltageSource) getPWLVoltage() float64 {
-	// PWL은 나중에
-	return 0
+func (v *VoltageSource) getPWLVoltage(t float64) float64 {
+	// 첫 시간 이전
+	if t <= v.times[0] {
+		return v.values[0]
+	}
+
+	// 마지막 시간 이후
+	lastIdx := len(v.times) - 1
+	if t >= v.times[lastIdx] {
+		return v.values[lastIdx]
+	}
+
+	// 해당하는 구간 찾기
+	for i := 1; i < len(v.times); i++ {
+		if t <= v.times[i] {
+			// 선형 보간
+			t1, t2 := v.times[i-1], v.times[i]
+			v1, v2 := v.values[i-1], v.values[i]
+			slope := (v2 - v1) / (t2 - t1)
+			return v1 + slope*(t-t1)
+		}
+	}
+
+	// 이론적으로 여기까지 오면 안됨
+	return v.values[lastIdx]
 }
 
 func (v *VoltageSource) BranchIndex() int {

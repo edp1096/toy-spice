@@ -1,0 +1,5 @@
+* vpwl test circuit
+Vpwl n1 0 PWL(0 0 2ms 0 2.5ms 3.3 5ms 3.3 5.5ms 0 10ms 0)
+R1 n1 0 1k
+
+.tran 0.1ms 15ms
