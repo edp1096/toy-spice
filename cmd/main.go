@@ -86,7 +86,6 @@ func printResults(results map[string][]float64) {
 		fmt.Println("Sweep Values    Node Voltages        Branch Currents")
 		fmt.Println("------------------------------------------------")
 
-		// 변수명 정렬
 		var voltageNames, currentNames []string
 		for name := range results {
 			if name == "SWEEP1" || name == "SWEEP2" {
@@ -101,10 +100,8 @@ func printResults(results map[string][]float64) {
 		sort.Strings(voltageNames)
 		sort.Strings(currentNames)
 
-		// 결과 출력
 		_, hasNested := results["SWEEP2"]
 		for i := range sweep1 {
-			// Sweep 값 출력
 			if hasNested {
 				sweep2 := results["SWEEP2"]
 				fmt.Printf("V1=%-9s V2=%-9s  ",
@@ -114,13 +111,11 @@ func printResults(results map[string][]float64) {
 				fmt.Printf("V=%-9s  ", util.FormatValueFactor(sweep1[i], "V"))
 			}
 
-			// 노드 전압 출력
 			for _, name := range voltageNames {
 				if values, ok := results[name]; ok {
 					fmt.Printf("%s=%s  ", name, util.FormatValueFactor(values[i], "V"))
 				}
 			}
-			// 분기 전류 출력
 			for _, name := range currentNames {
 				if values, ok := results[name]; ok {
 					fmt.Printf("%s=%s  ", name, util.FormatValueFactor(values[i], "A"))

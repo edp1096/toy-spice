@@ -230,9 +230,9 @@ func parseElement(line string) (*Element, error) {
 	}
 
 	if elem.Type == "D" {
-		elem.Nodes = fields[1:3] // 노드 2개만 가져오기
+		elem.Nodes = fields[1:3]
 		if len(fields) > 3 {
-			// 나중에 파라미터 처리를 위해 저장
+			// 파라미터 처리 나중에
 			elem.Params["model"] = fields[3]
 		}
 		return elem, nil

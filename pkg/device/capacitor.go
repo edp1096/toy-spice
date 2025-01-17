@@ -35,10 +35,6 @@ func NewCapacitor(name string, nodeNames []string, value float64) *Capacitor {
 	}
 }
 
-func NewCapacitorNotUse(name string, nodeNames []string, value float64) *Capacitor {
-	return &Capacitor{BaseDevice: *NewBaseDevice(name, value, nodeNames, "C")}
-}
-
 func (c *Capacitor) GetType() string { return "C" }
 
 func (c *Capacitor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {

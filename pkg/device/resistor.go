@@ -26,12 +26,6 @@ func NewResistor(name string, nodeNames []string, value float64) *Resistor {
 	}
 }
 
-func NewResistorNotUse(name string, nodeNames []string, value float64) *Resistor {
-	return &Resistor{
-		BaseDevice: *NewBaseDevice(name, value, nodeNames, "R"),
-	}
-}
-
 func (r *Resistor) GetType() string { return "R" }
 
 func (r *Resistor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
@@ -46,7 +40,7 @@ func (r *Resistor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 
 	switch status.Mode {
 	case ACAnalysis:
-		// Resistor for AC only has real conductance
+		// AC
 		if n1 != 0 {
 			matrix.AddComplexElement(n1, n1, g, 0)
 			if n2 != 0 {

@@ -75,25 +75,6 @@ func NewSinVoltageSource(name string, nodeNames []string, offset, amplitude, fre
 	}
 }
 
-func NewDCVoltageSourceNotUse(name string, nodeNames []string, value float64) *VoltageSource {
-	return &VoltageSource{
-		BaseDevice: *NewBaseDevice(name, value, nodeNames, "V"),
-		vtype:      DC,
-		dcValue:    value,
-	}
-}
-
-func NewSinVoltageSourceNotUse(name string, nodeNames []string, offset, amplitude, freq, phase float64) *VoltageSource {
-	return &VoltageSource{
-		BaseDevice: *NewBaseDevice(name, offset, nodeNames, "V"),
-		vtype:      SIN,
-		dcValue:    offset,
-		amplitude:  amplitude,
-		freq:       freq,
-		phase:      phase,
-	}
-}
-
 func NewACVoltageSource(name string, nodeNames []string, dcValue, acMag, acPhase float64) *VoltageSource {
 	return &VoltageSource{
 		BaseDevice: BaseDevice{

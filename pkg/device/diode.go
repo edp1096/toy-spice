@@ -76,39 +76,17 @@ func (d *Diode) thermalVoltage(temp float64) float64 {
 	)
 
 	if temp <= 0 {
-		temp = 300.15 // 절대온도 (K)
+		temp = 300.15
 	}
 
 	return BOLTZMANN * temp / CHARGE
 }
 
-// Bias current
-func (d *Diode) calculateCurrentNotUse(vd float64, vt float64) float64 {
-	// Forward bias
-	if vd >= -5*vt {
-		expArg := vd / (d.N * vt)
-		if expArg > 40 { // Prevent overflow - exp(40) ≈ 10^17
-			expArg = 40
-		}
-		expVt := math.Exp(expArg)
-
-		return d.Is * (expVt - 1)
-	}
-
-	// Reverse breakdown
-	if vd < -d.Bv {
-		return -d.Is * (1 + (vd+d.Bv)/vt)
-	}
-
-	return -d.Is
-}
-
-// Compute temperature-dependent Is
 func (d *Diode) temperatureAdjustedIs(temp float64) float64 {
 	const REFTEMP = 300.15 // 27°C
 	vt := d.thermalVoltage(temp)
 
-	// SPICE3F5 formula: is(T2) = is(T1) * (T2/T1)^(XTI/N) * exp(-(Eg/(2*k))*(1/T2 - 1/T1))
+	// is(T2) = is(T1) * (T2/T1)^(XTI/N) * exp(-(Eg/(2*k))*(1/T2 - 1/T1))
 	ratio := temp / REFTEMP
 	egfact := -d.Eg / (2 * vt) * (temp/REFTEMP - 1.0)
 
