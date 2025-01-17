@@ -5,15 +5,6 @@ import (
 	"toy-spice/pkg/matrix"
 )
 
-type VoltageType int
-
-const (
-	DC VoltageType = iota
-	SIN
-	PULSE
-	PWL
-)
-
 type ACVoltageSource struct {
 	acMag   float64
 	acPhase float64
@@ -21,7 +12,7 @@ type ACVoltageSource struct {
 
 type VoltageSource struct {
 	BaseDevice
-	vtype VoltageType
+	vtype SourceType
 	// DC, common params
 	dcValue float64
 	// SIN params
@@ -100,7 +91,7 @@ func NewPWLVoltageSource(name string, nodeNames []string, times []float64, value
 			Name:      name,
 			Nodes:     make([]int, len(nodeNames)),
 			NodeNames: nodeNames,
-			Value:     values[0], // 첫 번째 값을 초기값으로
+			Value:     values[0], // First value as initial value
 		},
 		vtype:  PWL,
 		times:  times,
@@ -188,18 +179,15 @@ func (v *VoltageSource) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatu
 }
 
 func (v *VoltageSource) getPulseVoltage(t float64) float64 {
-	// Delay 이전에는 v1
 	if t < v.delay {
 		return v.v1
 	}
 
-	// 주기내 상대 시간 계산
 	t = t - v.delay
 	if v.period > 0 {
 		t = math.Mod(t, v.period)
 	}
 
-	// Rise 구간
 	if t < v.rise {
 		if v.rise == 0 {
 			return v.v2
@@ -207,12 +195,10 @@ func (v *VoltageSource) getPulseVoltage(t float64) float64 {
 		return v.v1 + (v.v2-v.v1)*t/v.rise
 	}
 
-	// Pulse width 구간
 	if t < v.rise+v.pWidth {
 		return v.v2
 	}
 
-	// Fall 구간
 	fallStart := v.rise + v.pWidth
 	if t < fallStart+v.fall {
 		if v.fall == 0 {
@@ -221,26 +207,21 @@ func (v *VoltageSource) getPulseVoltage(t float64) float64 {
 		return v.v2 - (v.v2-v.v1)*(t-fallStart)/v.fall
 	}
 
-	// 나머지 구간은 v1
 	return v.v1
 }
 
 func (v *VoltageSource) getPWLVoltage(t float64) float64 {
-	// 첫 시간 이전
 	if t <= v.times[0] {
 		return v.values[0]
 	}
 
-	// 마지막 시간 이후
 	lastIdx := len(v.times) - 1
 	if t >= v.times[lastIdx] {
 		return v.values[lastIdx]
 	}
 
-	// 해당하는 구간 찾기
 	for i := 1; i < len(v.times); i++ {
 		if t <= v.times[i] {
-			// 선형 보간
 			t1, t2 := v.times[i-1], v.times[i]
 			v1, v2 := v.values[i-1], v.values[i]
 			slope := (v2 - v1) / (t2 - t1)
@@ -248,8 +229,7 @@ func (v *VoltageSource) getPWLVoltage(t float64) float64 {
 		}
 	}
 
-	// 이론적으로 여기까지 오면 안됨
-	return v.values[lastIdx]
+	return v.values[lastIdx] // Must not reach
 }
 
 func (v *VoltageSource) BranchIndex() int {

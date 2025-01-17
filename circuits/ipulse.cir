@@ -1,0 +1,4 @@
+* ipulse test
+Ipulse n1 0 PULSE(0 5m 2m 0.5m 0.5m 5m 10m)
+R1 n1 0 1k
+.tran 0.1m 30m

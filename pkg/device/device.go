@@ -37,6 +37,15 @@ type BaseDevice struct {
 	NodeNames []string
 }
 
+type SourceType int
+
+const (
+	DC SourceType = iota
+	SIN
+	PULSE
+	PWL
+)
+
 type AnalysisMode int
 
 const (

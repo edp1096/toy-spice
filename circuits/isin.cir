@@ -1,0 +1,4 @@
+* isin test circuit
+Isin n1 0 SIN(0 2m 1k 0)  ; offset=0, amplitude=2mA, freq=1kHz, phase=0
+R1 n1 0 1k
+.tran 0.1ms 3ms

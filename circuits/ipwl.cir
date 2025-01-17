@@ -1,0 +1,4 @@
+* ipwl test circuit
+Ipwl n1 0 PWL(0 0 2m 0 2.5m 3.3m 5m 3.3m 5.5m 0 10m 0)
+R1 n1 0 1k
+.tran 0.1m 15m

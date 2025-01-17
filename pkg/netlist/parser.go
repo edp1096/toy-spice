@@ -224,30 +224,30 @@ func parseElement(line string) (*Element, error) {
 		Params: make(map[string]string),
 	}
 
-	// TODO: I
-	if elem.Type == "V" {
+	switch elem.Type {
+	case "V":
 		return parseVoltageSource(fields)
-	}
-
-	if elem.Type == "D" {
+	case "I":
+		return parseCurrentSource(fields)
+	case "D":
 		elem.Nodes = fields[1:3]
 		if len(fields) > 3 {
 			// 파라미터 처리 나중에
 			elem.Params["model"] = fields[3]
 		}
 		return elem, nil
-	}
+	default:
+		// Parts - RLC..
+		elem.Nodes = fields[1 : len(fields)-1]
+		valueStr := fields[len(fields)-1]
+		value, err := ParseValue(valueStr)
+		if err != nil {
+			return nil, err
+		}
+		elem.Value = value
 
-	// Parts - RLC..
-	elem.Nodes = fields[1 : len(fields)-1]
-	valueStr := fields[len(fields)-1]
-	value, err := ParseValue(valueStr)
-	if err != nil {
-		return nil, err
+		return elem, nil
 	}
-	elem.Value = value
-
-	return elem, nil
 }
 
 func parseVoltageSource(fields []string) (*Element, error) {
@@ -324,6 +324,79 @@ func parseVoltageSource(fields []string) (*Element, error) {
 	return elem, nil
 }
 
+func parseCurrentSource(fields []string) (*Element, error) {
+	if len(fields) < 4 {
+		return nil, fmt.Errorf("insufficient current source parameters")
+	}
+
+	elem := &Element{
+		Name:   fields[0],
+		Type:   "I",
+		Nodes:  []string{fields[1], fields[2]},
+		Params: make(map[string]string),
+	}
+
+	remaining := strings.Join(fields[3:], " ")
+	remaining = strings.ReplaceAll(remaining, "(", " ( ")
+	remaining = strings.ReplaceAll(remaining, ")", " ) ")
+	words := strings.Fields(remaining)
+	if len(words) == 0 {
+		return nil, fmt.Errorf("missing current source type")
+	}
+
+	switch strings.ToUpper(words[0]) {
+	case "DC":
+		if len(words) < 2 {
+			return nil, fmt.Errorf("missing DC value")
+		}
+		elem.Params["type"] = "dc"
+		value, err := ParseValue(words[1])
+		if err != nil {
+			return nil, err
+		}
+		elem.Value = value
+
+	case "SIN":
+		elem.Params["type"] = "sin"
+		sinParams := strings.Join(words[1:], " ")
+		sinParams = strings.Trim(sinParams, "() ")
+		elem.Params["sin"] = sinParams
+
+	case "PULSE":
+		elem.Params["type"] = "pulse"
+		pulseParams := strings.Join(words[1:], " ")
+		pulseParams = strings.Trim(pulseParams, "() ")
+		elem.Params["pulse"] = pulseParams
+
+	case "PWL":
+		elem.Params["type"] = "pwl"
+		pwlParams := strings.Join(words[1:], " ")
+		pwlParams = strings.Trim(pwlParams, "() ")
+		elem.Params["pwl"] = pwlParams
+
+	case "AC":
+		if len(words) < 2 {
+			return nil, fmt.Errorf("missing AC magnitude")
+		}
+		elem.Params["type"] = "ac"
+		magnitude, err := ParseValue(words[1])
+		if err != nil {
+			return nil, fmt.Errorf("invalid AC magnitude: %v", err)
+		}
+		elem.Value = magnitude
+		if len(words) > 2 {
+			elem.Params["phase"] = words[2]
+		} else {
+			elem.Params["phase"] = "0" // Default phase
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported current source type: %s", words[0])
+	}
+
+	return elem, nil
+}
+
 // ParseValue - Parse value and factor. 1k -> 1000
 func ParseValue(val string) (float64, error) {
 	// re := regexp.MustCompile(`^([-+]?\d*\.?\d+)([TGMKkmunpf])?s?$`)
@@ -389,6 +462,37 @@ func CreateDevice(elem Element, nodeMap map[string]int) (device.Device, error) {
 			return device.NewACVoltageSource(elem.Name, elem.Nodes, 0, elem.Value, phase), nil
 		default:
 			return nil, fmt.Errorf("unsupported voltage source type: %s", elem.Params["type"])
+		}
+	case "I":
+		switch elem.Params["type"] {
+		case "dc":
+			return device.NewDCCurrentSource(elem.Name, elem.Nodes, elem.Value), nil
+		case "sin":
+			offset, amplitude, freq, phase, err := parseSinParams(elem.Params["sin"])
+			if err != nil {
+				return nil, err
+			}
+			return device.NewSinCurrentSource(elem.Name, elem.Nodes, offset, amplitude, freq, phase), nil
+		case "pulse":
+			i1, i2, delay, rise, fall, pWidth, period, err := parsePulseParams(elem.Params["pulse"])
+			if err != nil {
+				return nil, err
+			}
+			return device.NewPulseCurrentSource(elem.Name, elem.Nodes, i1, i2, delay, rise, fall, pWidth, period), nil
+		case "pwl":
+			times, values, err := parsePWLParams(elem.Params["pwl"])
+			if err != nil {
+				return nil, err
+			}
+			return device.NewPWLCurrentSource(elem.Name, elem.Nodes, times, values), nil
+		case "ac":
+			phase, err := ParseValue(elem.Params["phase"])
+			if err != nil {
+				return nil, fmt.Errorf("invalid AC phase: %v", err)
+			}
+			return device.NewACCurrentSource(elem.Name, elem.Nodes, 0, elem.Value, phase), nil
+		default:
+			return nil, fmt.Errorf("unsupported current source type: %s", elem.Params["type"])
 		}
 	}
 	return nil, fmt.Errorf("unsupported device type: %s", elem.Type)

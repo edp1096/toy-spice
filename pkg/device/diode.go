@@ -71,8 +71,8 @@ func (d *Diode) setDefaultParameters() {
 
 func (d *Diode) thermalVoltage(temp float64) float64 {
 	const (
-		CHARGE    = 1.6021918e-19 // 전자 전하량 (C)
-		BOLTZMANN = 1.3806226e-23 // 볼츠만 상수 (J/K)
+		CHARGE    = 1.6021918e-19 // Electron charge (C)
+		BOLTZMANN = 1.3806226e-23 // Boltzmann constant (J/K)
 	)
 
 	if temp <= 0 {
@@ -83,7 +83,7 @@ func (d *Diode) thermalVoltage(temp float64) float64 {
 }
 
 func (d *Diode) temperatureAdjustedIs(temp float64) float64 {
-	const REFTEMP = 300.15 // 27°C
+	const REFTEMP = 300.15 // 27degC
 	vt := d.thermalVoltage(temp)
 
 	// is(T2) = is(T1) * (T2/T1)^(XTI/N) * exp(-(Eg/(2*k))*(1/T2 - 1/T1))
@@ -108,7 +108,6 @@ func (d *Diode) calculateCurrent(vd, temp float64) float64 {
 		return is_t * (evd - 1.0)
 	}
 
-	// Strong reverse bias - SPICE3F5는 단순히 -Is를 반환
 	return -d.temperatureAdjustedIs(temp)
 }
 
@@ -148,10 +147,10 @@ func (d *Diode) diffusionCapacitance(vd float64, temp float64, timeStep float64)
 		return 0.0
 	}
 
-	// 현재 전류
+	// Current right now
 	id := d.calculateCurrent(vd, temp)
 
-	// dI/dt 계산 (전류 시간 미분)
+	// dI/dt
 	didt := (id - d.idOld) / timeStep
 
 	// Transit Time capacitance: Cd = Tt * dI/dt

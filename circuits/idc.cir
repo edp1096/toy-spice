@@ -1,0 +1,4 @@
+* idc test
+I1 n1 0 DC 1m
+R1 n1 0 1k
+.op
