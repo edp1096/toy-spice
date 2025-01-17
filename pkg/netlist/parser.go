@@ -15,6 +15,7 @@ const (
 	AnalysisOP AnalysisType = iota
 	AnalysisTRAN
 	AnalysisAC
+	AnalysisDC
 )
 
 type Circuit struct {
@@ -33,6 +34,16 @@ type Circuit struct {
 		FStart float64 // start frequency
 		Points int     // points per decade
 		FStop  float64 // stop frequency
+	}
+	DCParam struct {
+		Source1 string
+		Start1  float64
+		Stop1   float64
+		Step1   int
+		Source2 string
+		Start2  float64
+		Stop2   float64
+		Step2   int
 	}
 	Title string // Circuit title
 }
@@ -172,6 +183,39 @@ func parseAnalysis(ckt *Circuit, line string) error {
 		}
 		if ckt.ACParam.FStop, err = ParseValue(fields[4]); err != nil {
 			return fmt.Errorf("invalid fstop: %v", err)
+		}
+
+	case ".dc":
+		ckt.Analysis = AnalysisDC
+		if len(fields) < 5 {
+			return fmt.Errorf("insufficient DC sweep parameters")
+		}
+
+		// First source sweep
+		ckt.DCParam.Source1 = fields[1]
+		var err error
+		if ckt.DCParam.Start1, err = ParseValue(fields[2]); err != nil {
+			return fmt.Errorf("invalid start value: %v", err)
+		}
+		if ckt.DCParam.Stop1, err = ParseValue(fields[3]); err != nil {
+			return fmt.Errorf("invalid stop value: %v", err)
+		}
+		if ckt.DCParam.Step1, err = strconv.Atoi(fields[4]); err != nil {
+			return fmt.Errorf("invalid step count: %v", err)
+		}
+
+		// Optional second source (nested sweep)
+		if len(fields) > 8 {
+			ckt.DCParam.Source2 = fields[5]
+			if ckt.DCParam.Start2, err = ParseValue(fields[6]); err != nil {
+				return fmt.Errorf("invalid second start value: %v", err)
+			}
+			if ckt.DCParam.Stop2, err = ParseValue(fields[7]); err != nil {
+				return fmt.Errorf("invalid second stop value: %v", err)
+			}
+			if ckt.DCParam.Step2, err = strconv.Atoi(fields[8]); err != nil {
+				return fmt.Errorf("invalid second step count: %v", err)
+			}
 		}
 
 	default:

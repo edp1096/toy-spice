@@ -190,3 +190,8 @@ func (v *VoltageSource) BranchIndex() int {
 func (v *VoltageSource) SetBranchIndex(idx int) {
 	v.branchIdx = idx
 }
+
+func (v *VoltageSource) SetValue(value float64) {
+	v.Value = value
+	v.dcValue = value
+}

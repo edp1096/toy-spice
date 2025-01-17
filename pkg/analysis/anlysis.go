@@ -12,6 +12,7 @@ const (
 	OP int = iota
 	TRAN
 	AC
+	DC
 )
 
 type Analysis interface {
