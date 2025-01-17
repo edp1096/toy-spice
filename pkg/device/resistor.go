@@ -7,6 +7,9 @@ import (
 
 type Resistor struct {
 	BaseDevice
+	Tc1  float64
+	Tc2  float64
+	Tnom float64
 }
 
 func NewResistor(name string, nodeNames []string, value float64) *Resistor {
@@ -17,6 +20,9 @@ func NewResistor(name string, nodeNames []string, value float64) *Resistor {
 			NodeNames: nodeNames,
 			Value:     value,
 		},
+		Tc1:  0.0,
+		Tc2:  0.0,
+		Tnom: 300.15,
 	}
 }
 
@@ -34,7 +40,9 @@ func (r *Resistor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 	}
 
 	n1, n2 := r.Nodes[0], r.Nodes[1]
-	g := 1.0 / r.Value // Conductance. G = 1/R
+
+	// g := 1.0 / r.Value // Conductance. G = 1/R
+	g := 1.0 / r.temperatureAdjustedValue(status.Temp)
 
 	switch status.Mode {
 	case ACAnalysis:
@@ -69,4 +77,10 @@ func (r *Resistor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 	}
 
 	return nil
+}
+
+func (r *Resistor) temperatureAdjustedValue(temp float64) float64 {
+	dt := temp - r.Tnom
+	factor := 1.0 + r.Tc1*dt + r.Tc2*dt*dt
+	return r.Value * factor
 }

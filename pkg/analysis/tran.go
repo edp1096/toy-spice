@@ -83,21 +83,10 @@ func (tr *Transient) Execute() error {
 			Gmin:     tr.convergence.gmin,
 		}
 		tr.Circuit.Status = status
+		tr.Circuit.SetTimeStep(tr.timeStep)
 
-		// Gmin stepping을 사용한 해 탐색
-		gminValues := []float64{1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10, 1e-11, tr.convergence.gmin}
-		solved := false
-
-		for _, gmin := range gminValues {
-			status.Gmin = gmin
-			err := tr.doNRiter(gmin, tr.convergence.maxIter)
-			if err == nil {
-				solved = true
-				break
-			}
-		}
-
-		if !solved {
+		err := tr.doNRiter(0, tr.convergence.maxIter)
+		if err != nil {
 			if tr.timeStep > tr.minStep {
 				tr.timeStep /= 2
 				continue
@@ -105,17 +94,15 @@ func (tr *Transient) Execute() error {
 			return fmt.Errorf("failed to converge at t=%g", tr.time)
 		}
 
-		// 해를 찾은 경우
 		tr.Circuit.Update()
 		tr.time = nextTime
 		if tr.time >= tr.startTime {
 			tr.StoreTimeResult(tr.time, tr.Circuit.GetSolution())
 		}
 
-		// 다음 스텝 준비
 		if tr.time < tr.stopTime {
 			if tr.timeStep < tr.maxStep {
-				tr.timeStep *= 1.1 // 좀 더 보수적인 증가율
+				tr.timeStep *= 1.1
 				if tr.timeStep > tr.maxStep {
 					tr.timeStep = tr.maxStep
 				}
@@ -126,7 +113,7 @@ func (tr *Transient) Execute() error {
 	return nil
 }
 
-func (tr *Transient) doNRiter(gmin float64, maxIter int) error {
+func (tr *Transient) doNRiterNotUse(gmin float64, maxIter int) error {
 	ckt := tr.Circuit
 	mat := ckt.GetMatrix()
 	var oldSolution map[string]float64
@@ -189,6 +176,62 @@ func (tr *Transient) doNRiter(gmin float64, maxIter int) error {
 		for k, v := range solution {
 			oldSolution[k] = v
 		}
+	}
+
+	return fmt.Errorf("failed to converge in %d iterations", maxIter)
+}
+
+func (tr *Transient) doNRiter(gmin float64, maxIter int) error {
+	ckt := tr.Circuit
+	mat := ckt.GetMatrix()
+	var oldSolution []float64
+	cktStatus := &device.CircuitStatus{
+		Time:     tr.time,
+		TimeStep: tr.timeStep,
+		Mode:     device.TransientAnalysis,
+		Method:   tr.order,
+		Temp:     300.15,
+		Gmin:     gmin,
+	}
+
+	for iter := 0; iter < maxIter; iter++ {
+		mat.Clear()
+		if iter > 0 {
+			if err := ckt.UpdateNonlinearVoltages(oldSolution); err != nil {
+				return fmt.Errorf("updating nonlinear voltages: %v", err)
+			}
+		}
+
+		if err := ckt.Stamp(cktStatus); err != nil {
+			return fmt.Errorf("stamping error: %v", err)
+		}
+		mat.LoadGmin(gmin)
+		if err := mat.Solve(); err != nil {
+			return fmt.Errorf("matrix solve error: %v", err)
+		}
+
+		solution := mat.Solution()
+		if iter > 0 {
+			allConverged := true
+			for i := 1; i < len(solution); i++ {
+				diff := math.Abs(solution[i] - oldSolution[i])
+				reltol := tr.convergence.reltol*math.Max(
+					math.Abs(solution[i]),
+					math.Abs(oldSolution[i])) + tr.convergence.abstol
+				if diff > reltol {
+					allConverged = false
+					break
+				}
+			}
+			if allConverged {
+				return nil
+			}
+		}
+
+		if oldSolution == nil {
+			oldSolution = make([]float64, len(solution))
+		}
+		copy(oldSolution, solution)
 	}
 
 	return fmt.Errorf("failed to converge in %d iterations", maxIter)

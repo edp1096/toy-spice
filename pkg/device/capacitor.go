@@ -13,6 +13,10 @@ type Capacitor struct {
 	current1 float64 // Previous current
 	charge0  float64 // Current charge
 	charge1  float64 // Previous charge
+
+	Tc1  float64
+	Tc2  float64
+	Tnom float64
 }
 
 var _ TimeDependent = (*Capacitor)(nil)
@@ -25,6 +29,9 @@ func NewCapacitor(name string, nodeNames []string, value float64) *Capacitor {
 			NodeNames: nodeNames,
 			Value:     value,
 		},
+		Tc1:  0.0,
+		Tc2:  0.0,
+		Tnom: 300.15,
 	}
 }
 
@@ -36,12 +43,14 @@ func (c *Capacitor) GetType() string { return "C" }
 
 func (c *Capacitor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 	n1, n2 := c.Nodes[0], c.Nodes[1]
+	adjustedC := c.temperatureAdjustedValue(status.Temp)
 
 	switch status.Mode {
 	case ACAnalysis:
 		omega := 2 * math.Pi * status.Frequency
 		capConductanceReal := 0.0
-		capConductanceImag := omega * c.Value // C * jω
+		// capConductanceImag := omega * c.Value // C * jω
+		capConductanceImag := omega * adjustedC // C * jω
 
 		if n1 != 0 {
 			matrix.AddComplexElement(n1, n1, capConductanceReal, capConductanceImag)
@@ -78,7 +87,8 @@ func (c *Capacitor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) err
 	case TransientAnalysis:
 		// Transient
 		dt := status.TimeStep
-		geq := c.Value / dt
+		// geq := c.Value / dt
+		geq := adjustedC / dt
 		ceq := geq * c.Voltage0
 
 		if n1 != 0 {
@@ -131,4 +141,10 @@ func (c *Capacitor) CalculateLTE(voltages map[string]float64, status *CircuitSta
 	qOld := c.Value * c.Voltage1
 
 	return math.Abs(qNew-qOld) / (2.0 * status.TimeStep)
+}
+
+func (c *Capacitor) temperatureAdjustedValue(temp float64) float64 {
+	dt := temp - c.Tnom
+	factor := 1.0 + c.Tc1*dt + c.Tc2*dt*dt
+	return c.Value * factor
 }
