@@ -36,14 +36,14 @@ type Circuit struct {
 		FStop  float64 // stop frequency
 	}
 	DCParam struct {
-		Source1 string
-		Start1  float64
-		Stop1   float64
-		Step1   int
-		Source2 string
-		Start2  float64
-		Stop2   float64
-		Step2   int
+		Source1    string
+		Start1     float64
+		Stop1      float64
+		Increment1 float64
+		Source2    string
+		Start2     float64
+		Stop2      float64
+		Increment2 float64
 	}
 	Title string // Circuit title
 }
@@ -200,22 +200,8 @@ func parseAnalysis(ckt *Circuit, line string) error {
 		if ckt.DCParam.Stop1, err = ParseValue(fields[3]); err != nil {
 			return fmt.Errorf("invalid stop value: %v", err)
 		}
-		if ckt.DCParam.Step1, err = strconv.Atoi(fields[4]); err != nil {
-			return fmt.Errorf("invalid step count: %v", err)
-		}
-
-		// Optional second source (nested sweep)
-		if len(fields) > 8 {
-			ckt.DCParam.Source2 = fields[5]
-			if ckt.DCParam.Start2, err = ParseValue(fields[6]); err != nil {
-				return fmt.Errorf("invalid second start value: %v", err)
-			}
-			if ckt.DCParam.Stop2, err = ParseValue(fields[7]); err != nil {
-				return fmt.Errorf("invalid second stop value: %v", err)
-			}
-			if ckt.DCParam.Step2, err = strconv.Atoi(fields[8]); err != nil {
-				return fmt.Errorf("invalid second step count: %v", err)
-			}
+		if ckt.DCParam.Increment1, err = ParseValue(fields[4]); err != nil { // Step1을 Increment1으로 변경
+			return fmt.Errorf("invalid increment value: %v", err)
 		}
 
 	default:

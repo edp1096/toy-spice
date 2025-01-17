@@ -1,5 +1,5 @@
 * Diode Test Circuit. Half wave rectifier
-.dc Vin 0 5 50
+.dc Vin -1 3 0.1
 Vin 1 0 DC 0
 d1 1 2 D
 r1 2 0 1k

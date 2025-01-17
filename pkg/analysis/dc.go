@@ -11,12 +11,12 @@ type DCSweep struct {
 	sourceNames []string    // Names of voltage/current sources to sweep
 	startVals   []float64   // Start values for each source
 	stopVals    []float64   // Stop values for each source
-	steps       []int       // Number of steps for each source
+	increments  []float64   // Incremental value of steps for each source
 	sweepVals   [][]float64 // Generated sweep values for each source
 	origVals    []float64   // Original values of the sources
 }
 
-func NewDCSweep(sources []string, starts, stops []float64, numSteps []int) *DCSweep {
+func NewDCSweep(sources []string, starts, stops []float64, numSteps []float64) *DCSweep {
 	if len(sources) != len(starts) || len(sources) != len(stops) || len(sources) != len(numSteps) {
 		panic("inconsistent parameter lengths")
 	}
@@ -26,18 +26,18 @@ func NewDCSweep(sources []string, starts, stops []float64, numSteps []int) *DCSw
 		sourceNames:  sources,
 		startVals:    starts,
 		stopVals:     stops,
-		steps:        numSteps,
+		increments:   numSteps,
 		sweepVals:    make([][]float64, len(sources)),
 		origVals:     make([]float64, len(sources)),
 	}
 
 	// Generate sweep values for each source
 	for i := range sources {
-		dc.sweepVals[i] = make([]float64, numSteps[i])
-		step := (stops[i] - starts[i]) / float64(numSteps[i]-1)
-		for j := 0; j < numSteps[i]; j++ {
-			dc.sweepVals[i][j] = starts[i] + float64(j)*step
+		sweep := make([]float64, 0)
+		for v := dc.startVals[i]; v <= dc.stopVals[i]; v += dc.increments[i] {
+			sweep = append(sweep, v)
 		}
+		dc.sweepVals[i] = sweep
 	}
 
 	return dc

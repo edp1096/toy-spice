@@ -324,7 +324,7 @@ func procWithPrint() {
 				[]string{param.Source1, param.Source2},
 				[]float64{param.Start1, param.Start2},
 				[]float64{param.Stop1, param.Stop2},
-				[]int{param.Step1, param.Step2},
+				[]float64{param.Increment1, param.Increment2},
 			)
 		} else {
 			// single sweep
@@ -332,7 +332,7 @@ func procWithPrint() {
 				[]string{param.Source1},
 				[]float64{param.Start1},
 				[]float64{param.Stop1},
-				[]int{param.Step1},
+				[]float64{param.Increment1},
 			)
 		}
 	default:
@@ -405,7 +405,7 @@ func procWithoutPrint() {
 				[]string{param.Source1, param.Source2},
 				[]float64{param.Start1, param.Start2},
 				[]float64{param.Stop1, param.Stop2},
-				[]int{param.Step1, param.Step2},
+				[]float64{param.Increment1, param.Increment2},
 			)
 		} else {
 			// single sweep
@@ -413,7 +413,7 @@ func procWithoutPrint() {
 				[]string{param.Source1},
 				[]float64{param.Start1},
 				[]float64{param.Stop1},
-				[]int{param.Step1},
+				[]float64{param.Increment1},
 			)
 		}
 	default:
