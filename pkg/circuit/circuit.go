@@ -20,7 +20,7 @@ type Circuit struct {
 	isComplex        bool
 	prevSolution     map[string]float64
 	nonlinearDevices []device.NonLinear
-	Models           map[string]netlist.ModelParam
+	Models           map[string]device.ModelParam
 }
 
 func New(name string) *Circuit {
@@ -36,11 +36,11 @@ func NewWithComplex(name string, isComplex bool) *Circuit {
 		Status:       &device.CircuitStatus{},
 		prevSolution: make(map[string]float64),
 		isComplex:    isComplex,
-		Models:       make(map[string]netlist.ModelParam),
+		Models:       make(map[string]device.ModelParam),
 	}
 }
 
-func (c *Circuit) SetModels(models map[string]netlist.ModelParam) {
+func (c *Circuit) SetModels(models map[string]device.ModelParam) {
 	c.Models = models
 }
 

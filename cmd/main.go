@@ -128,15 +128,26 @@ func printResults(results map[string][]float64) {
 
 	// Operating point
 	if len(results["TIME"]) <= 1 {
-		fmt.Println("\nNode Voltages:")
-		for name, values := range results {
+		var voltageNames, currentNames []string
+		for name := range results {
 			if strings.HasPrefix(name, "V(") {
+				voltageNames = append(voltageNames, name)
+			} else if strings.HasPrefix(name, "I(") {
+				currentNames = append(currentNames, name)
+			}
+		}
+		sort.Strings(voltageNames)
+		sort.Strings(currentNames)
+
+		fmt.Println("\nNode Voltages:")
+		for _, name := range voltageNames {
+			if values, ok := results[name]; ok {
 				fmt.Printf("%s = %s\n", name, util.FormatValueFactor(values[0], "V"))
 			}
 		}
 		fmt.Println("\nBranch Currents:")
-		for name, values := range results {
-			if strings.HasPrefix(name, "I(") {
+		for _, name := range currentNames {
+			if values, ok := results[name]; ok {
 				fmt.Printf("%s = %s\n", name, util.FormatValueFactor(values[0], "A"))
 			}
 		}
@@ -294,7 +305,10 @@ func procWithPrint() {
 		}
 	}
 
-	// 3.3 Create devices and stamp
+	// 3.3 Setup Model parameters - Must run before SetupDevices
+	circuit.Models = ckt.Models
+
+	// 3.4 Create devices and stamp
 	err = circuit.SetupDevices(ckt.Elements)
 	if err != nil {
 		log.Fatalf("Error setting up devices: %v", err)
@@ -384,7 +398,10 @@ func procWithoutPrint() {
 	// 3.2 Create matrix
 	circuit.CreateMatrix()
 
-	// 3.3 Create devices and stamp
+	// 3.3 Setup Model parameters - Must run before SetupDevices
+	circuit.Models = ckt.Models
+
+	// 3.4 Create devices and stamp
 	err = circuit.SetupDevices(ckt.Elements)
 	if err != nil {
 		log.Fatalf("Error setting up devices: %v", err)

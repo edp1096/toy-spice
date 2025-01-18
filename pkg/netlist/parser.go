@@ -18,11 +18,11 @@ const (
 	AnalysisDC
 )
 
-type Circuit struct {
-	Elements  []Element             // Circuit elements
-	Nodes     map[string]int        // Node name and index
-	Models    map[string]ModelParam // Model parameters
-	Analysis  AnalysisType          // Analysis type
+type NetlistData struct {
+	Elements  []Element                    // Circuit elements
+	Nodes     map[string]int               // Node name and index
+	Models    map[string]device.ModelParam // Model parameters
+	Analysis  AnalysisType                 // Analysis type
 	TranParam struct {
 		TStep  float64 // timestep
 		TStop  float64 // stop time
@@ -57,12 +57,6 @@ type Element struct {
 	Params map[string]string // Parameter values
 }
 
-type ModelParam struct {
-	Type   string
-	Name   string
-	Params map[string]float64
-}
-
 var unitMap = map[string]float64{
 	"T":   1e12,  // tera
 	"G":   1e9,   // giga
@@ -76,17 +70,17 @@ var unitMap = map[string]float64{
 	"f":   1e-15, // femto
 }
 
-func Parse(input string) (*Circuit, error) {
+func Parse(input string) (*NetlistData, error) {
 	scanner := bufio.NewScanner(strings.NewReader(input))
-	circuit := &Circuit{
+	netlistData := &NetlistData{
 		Nodes:  make(map[string]int),
-		Models: make(map[string]ModelParam),
+		Models: make(map[string]device.ModelParam),
 	}
 
 	// Title or comment
 	if scanner.Scan() {
-		circuit.Title = strings.TrimPrefix(scanner.Text(), "*")
-		circuit.Title = strings.TrimSpace(circuit.Title)
+		netlistData.Title = strings.TrimPrefix(scanner.Text(), "*")
+		netlistData.Title = strings.TrimSpace(netlistData.Title)
 	}
 
 	for scanner.Scan() {
@@ -102,7 +96,7 @@ func Parse(input string) (*Circuit, error) {
 		}
 
 		if strings.HasPrefix(line, ".") { // Analysis type
-			err := parseAnalysis(circuit, line)
+			err := parseAnalysis(netlistData, line)
 			if err != nil {
 				return nil, err
 			}
@@ -114,20 +108,20 @@ func Parse(input string) (*Circuit, error) {
 			return nil, err
 		}
 
-		circuit.Elements = append(circuit.Elements, *element)
+		netlistData.Elements = append(netlistData.Elements, *element)
 
 		for _, node := range element.Nodes {
-			if _, exists := circuit.Nodes[node]; !exists {
-				circuit.Nodes[node] = len(circuit.Nodes)
+			if _, exists := netlistData.Nodes[node]; !exists {
+				netlistData.Nodes[node] = len(netlistData.Nodes)
 			}
 		}
 	}
 
-	return circuit, nil
+	return netlistData, nil
 }
 
 // Parse .op, .tran, .ac
-func parseAnalysis(ckt *Circuit, line string) error {
+func parseAnalysis(netlistData *NetlistData, line string) error {
 	var err error
 
 	fields := strings.Fields(line)
@@ -137,90 +131,90 @@ func parseAnalysis(ckt *Circuit, line string) error {
 
 	switch strings.ToLower(fields[0]) {
 	case ".model":
-		return parseModel(ckt, fields[1:])
+		return parseModel(netlistData, fields[1:])
 
 	case ".op":
-		ckt.Analysis = AnalysisOP
+		netlistData.Analysis = AnalysisOP
 
 	case ".tran":
-		ckt.Analysis = AnalysisTRAN
+		netlistData.Analysis = AnalysisTRAN
 		if len(fields) < 3 {
 			return fmt.Errorf("insufficient tran parameters, need at least tstep and tstop")
 		}
-		ckt.TranParam.TStep, err = ParseValue(fields[1])
+		netlistData.TranParam.TStep, err = ParseValue(fields[1])
 		if err != nil {
 			return fmt.Errorf("invalid tstep: %v", err)
 		}
-		ckt.TranParam.TStop, err = ParseValue(fields[2])
+		netlistData.TranParam.TStop, err = ParseValue(fields[2])
 		if err != nil {
 			return fmt.Errorf("invalid tstop: %v", err)
 		}
 
 		for i := 3; i < len(fields); i++ {
 			if fields[i] == "uic" {
-				ckt.TranParam.UIC = true
+				netlistData.TranParam.UIC = true
 				continue
 			}
 			if i == 3 {
-				ckt.TranParam.TStart, err = ParseValue(fields[i])
+				netlistData.TranParam.TStart, err = ParseValue(fields[i])
 				if err != nil {
 					return fmt.Errorf("invalid tstart: %v", err)
 				}
 			}
 			if i == 4 {
-				ckt.TranParam.TMax, err = ParseValue(fields[i])
+				netlistData.TranParam.TMax, err = ParseValue(fields[i])
 				if err != nil {
 					return fmt.Errorf("invalid tmax: %v", err)
 				}
 			}
 		}
-		if ckt.TranParam.TMax == 0 {
-			ckt.TranParam.TMax = ckt.TranParam.TStep
+		if netlistData.TranParam.TMax == 0 {
+			netlistData.TranParam.TMax = netlistData.TranParam.TStep
 		}
 
 	case ".ac":
-		ckt.Analysis = AnalysisAC
+		netlistData.Analysis = AnalysisAC
 		if len(fields) < 5 {
 			return fmt.Errorf("insufficient AC parameters, need sweep type, points, fstart, and fstop")
 		}
 
 		// DEC, OCT, LIN
-		ckt.ACParam.Sweep = strings.ToUpper(fields[1])
-		if ckt.ACParam.Sweep != "DEC" && ckt.ACParam.Sweep != "OCT" && ckt.ACParam.Sweep != "LIN" {
-			return fmt.Errorf("invalid sweep type: %s", ckt.ACParam.Sweep)
+		netlistData.ACParam.Sweep = strings.ToUpper(fields[1])
+		if netlistData.ACParam.Sweep != "DEC" && netlistData.ACParam.Sweep != "OCT" && netlistData.ACParam.Sweep != "LIN" {
+			return fmt.Errorf("invalid sweep type: %s", netlistData.ACParam.Sweep)
 		}
 
-		ckt.ACParam.Points, err = strconv.Atoi(fields[2])
+		netlistData.ACParam.Points, err = strconv.Atoi(fields[2])
 		if err != nil {
 			return fmt.Errorf("invalid points number: %v", err)
 		}
-		ckt.ACParam.FStart, err = ParseValue(fields[3])
+		netlistData.ACParam.FStart, err = ParseValue(fields[3])
 		if err != nil {
 			return fmt.Errorf("invalid fstart: %v", err)
 		}
-		ckt.ACParam.FStop, err = ParseValue(fields[4])
+		netlistData.ACParam.FStop, err = ParseValue(fields[4])
 		if err != nil {
 			return fmt.Errorf("invalid fstop: %v", err)
 		}
 
 	case ".dc":
-		ckt.Analysis = AnalysisDC
+		netlistData.Analysis = AnalysisDC
 		if len(fields) < 5 {
 			return fmt.Errorf("insufficient DC sweep parameters")
 		}
 
 		// First source sweep
-		ckt.DCParam.Source1 = fields[1]
+		netlistData.DCParam.Source1 = fields[1]
 		var err error
-		ckt.DCParam.Start1, err = ParseValue(fields[2])
+		netlistData.DCParam.Start1, err = ParseValue(fields[2])
 		if err != nil {
 			return fmt.Errorf("invalid start value: %v", err)
 		}
-		ckt.DCParam.Stop1, err = ParseValue(fields[3])
+		netlistData.DCParam.Stop1, err = ParseValue(fields[3])
 		if err != nil {
 			return fmt.Errorf("invalid stop value: %v", err)
 		}
-		ckt.DCParam.Increment1, err = ParseValue(fields[4]) // Step1을 Increment1으로 변경
+		netlistData.DCParam.Increment1, err = ParseValue(fields[4]) // Step1을 Increment1으로 변경
 		if err != nil {
 			return fmt.Errorf("invalid increment value: %v", err)
 		}
@@ -232,7 +226,7 @@ func parseAnalysis(ckt *Circuit, line string) error {
 	return nil
 }
 
-func parseModel(ckt *Circuit, fields []string) error {
+func parseModel(netlistData *NetlistData, fields []string) error {
 	if len(fields) < 2 {
 		return fmt.Errorf("insufficient model parameters")
 	}
@@ -280,7 +274,7 @@ func parseModel(ckt *Circuit, fields []string) error {
 		params[paramName] = value
 	}
 
-	ckt.Models[modelName] = ModelParam{
+	netlistData.Models[modelName] = device.ModelParam{
 		Type:   modelType,
 		Name:   modelName,
 		Params: params,
@@ -502,7 +496,7 @@ func ParseValue(val string) (float64, error) {
 }
 
 // func CreateDevice(elem Element, nodeMap map[string]int) (device.Device, error) {
-func CreateDevice(elem Element, nodeMap map[string]int, models map[string]ModelParam) (device.Device, error) {
+func CreateDevice(elem Element, nodeMap map[string]int, models map[string]device.ModelParam) (device.Device, error) {
 	switch elem.Type {
 	case "R":
 		return device.NewResistor(elem.Name, elem.Nodes, elem.Value), nil
@@ -693,7 +687,7 @@ func parsePWLParams(params string) (times []float64, values []float64, err error
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid PWL value[%d]: %v", i, err)
 		}
-		// 시간은 단조 증가해야 함
+
 		if i > 0 && times[i] <= times[i-1] {
 			return nil, nil, fmt.Errorf("PWL time points must be strictly increasing")
 		}

@@ -14,6 +14,19 @@ type Device interface {
 	SetNodes(nodes []int)
 }
 
+type BaseDevice struct {
+	Name      string
+	Nodes     []int
+	Value     float64
+	NodeNames []string
+}
+
+type ModelParam struct {
+	Type   string
+	Name   string
+	Params map[string]float64
+}
+
 type ACElement interface {
 	StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) error
 }
@@ -28,13 +41,6 @@ type NonLinear interface {
 	LoadConductance(matrix matrix.DeviceMatrix) error
 	LoadCurrent(matrix matrix.DeviceMatrix) error
 	UpdateVoltages(voltages []float64) error
-}
-
-type BaseDevice struct {
-	Name      string
-	Nodes     []int
-	Value     float64
-	NodeNames []string
 }
 
 type SourceType int
