@@ -19,9 +19,10 @@ const (
 )
 
 type Circuit struct {
-	Elements  []Element      // Circuit elements
-	Nodes     map[string]int // Node name and index
-	Analysis  AnalysisType   // Analysis type
+	Elements  []Element             // Circuit elements
+	Nodes     map[string]int        // Node name and index
+	Models    map[string]ModelParam // Model parameters
+	Analysis  AnalysisType          // Analysis type
 	TranParam struct {
 		TStep  float64 // timestep
 		TStop  float64 // stop time
@@ -56,6 +57,12 @@ type Element struct {
 	Params map[string]string // Parameter values
 }
 
+type ModelParam struct {
+	Type   string
+	Name   string
+	Params map[string]float64
+}
+
 var unitMap = map[string]float64{
 	"T":   1e12,  // tera
 	"G":   1e9,   // giga
@@ -72,7 +79,8 @@ var unitMap = map[string]float64{
 func Parse(input string) (*Circuit, error) {
 	scanner := bufio.NewScanner(strings.NewReader(input))
 	circuit := &Circuit{
-		Nodes: make(map[string]int),
+		Nodes:  make(map[string]int),
+		Models: make(map[string]ModelParam),
 	}
 
 	// Title or comment
@@ -128,6 +136,9 @@ func parseAnalysis(ckt *Circuit, line string) error {
 	}
 
 	switch strings.ToLower(fields[0]) {
+	case ".model":
+		return parseModel(ckt, fields[1:])
+
 	case ".op":
 		ckt.Analysis = AnalysisOP
 
@@ -206,6 +217,63 @@ func parseAnalysis(ckt *Circuit, line string) error {
 
 	default:
 		return fmt.Errorf("unsupported analysis type: %s", fields[0])
+	}
+
+	return nil
+}
+
+func parseModel(ckt *Circuit, fields []string) error {
+	if len(fields) < 2 {
+		return fmt.Errorf("insufficient model parameters")
+	}
+
+	modelName := fields[0]
+	modelType := strings.ToUpper(fields[1])
+
+	// Currently D model only
+	if modelType != "D" {
+		return fmt.Errorf("unsupported model type: %s", modelType)
+	}
+
+	// 파라미터 파싱
+	params := make(map[string]float64)
+
+	// 기본값 설정
+	params["is"] = 1e-14 // Saturation current
+	params["n"] = 1.0    // Emission coefficient
+	params["rs"] = 0.0   // Series resistance
+	params["cj0"] = 0.0  // Zero-bias junction capacitance
+	params["m"] = 0.5    // Grading coefficient
+	params["vj"] = 1.0   // Junction potential
+	params["bv"] = 100.0 // Breakdown voltage
+	params["eg"] = 1.11  // Energy gap
+	params["xti"] = 3.0  // Saturation current temp exp
+	params["tt"] = 0.0   // Transit time
+	params["fc"] = 0.5   // Forward-bias depletion capacitance coefficient
+
+	// Parse parameters (name=value pairs)
+	for i := 2; i < len(fields); i++ {
+		field := strings.TrimRight(fields[i], ")")
+
+		// pair := strings.Split(fields[i], "=")
+		pair := strings.Split(field, "=")
+		if len(pair) != 2 {
+			continue
+		}
+
+		paramName := strings.ToLower(pair[0])
+		value, err := ParseValue(pair[1])
+		if err != nil {
+			// return fmt.Errorf("invalid parameter value %s=%s: %v", paramName, pair[1], err)
+			return fmt.Errorf("invalid parameter value %s: %v", field, err)
+		}
+		params[paramName] = value
+	}
+
+	ckt.Models[modelName] = ModelParam{
+		Type:   modelType,
+		Name:   modelName,
+		Params: params,
 	}
 
 	return nil
@@ -400,7 +468,8 @@ func parseCurrentSource(fields []string) (*Element, error) {
 // ParseValue - Parse value and factor. 1k -> 1000
 func ParseValue(val string) (float64, error) {
 	// re := regexp.MustCompile(`^([-+]?\d*\.?\d+)([TGMKkmunpf])?s?$`)
-	re := regexp.MustCompile(`^([-+]?\d*\.?\d+)(meg|[TGMKkmunpf])?s?$`)
+	// re := regexp.MustCompile(`^([-+]?\d*\.?\d+)(meg|[TGMKkmunpf])?s?$`)
+	re := regexp.MustCompile(`^([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)(meg|[TGMKkmunpf])?s?$`)
 	matches := re.FindStringSubmatch(strings.TrimSpace(val))
 
 	if matches == nil {
@@ -422,7 +491,8 @@ func ParseValue(val string) (float64, error) {
 	return num, nil
 }
 
-func CreateDevice(elem Element, nodeMap map[string]int) (device.Device, error) {
+// func CreateDevice(elem Element, nodeMap map[string]int) (device.Device, error) {
+func CreateDevice(elem Element, nodeMap map[string]int, models map[string]ModelParam) (device.Device, error) {
 	switch elem.Type {
 	case "R":
 		return device.NewResistor(elem.Name, elem.Nodes, elem.Value), nil
@@ -431,7 +501,14 @@ func CreateDevice(elem Element, nodeMap map[string]int) (device.Device, error) {
 	case "C":
 		return device.NewCapacitor(elem.Name, elem.Nodes, elem.Value), nil
 	case "D":
-		return device.NewDiode(elem.Name, elem.Nodes), nil
+		// return device.NewDiode(elem.Name, elem.Nodes), nil
+		diode := device.NewDiode(elem.Name, elem.Nodes)
+		if modelName, ok := elem.Params["model"]; ok {
+			if model, exists := models[modelName]; exists {
+				diode.SetModelParameters(model.Params)
+			}
+		}
+		return diode, nil
 	case "V":
 		switch elem.Params["type"] {
 		case "dc":

@@ -20,6 +20,7 @@ type Circuit struct {
 	isComplex        bool
 	prevSolution     map[string]float64
 	nonlinearDevices []device.NonLinear
+	Models           map[string]netlist.ModelParam
 }
 
 func New(name string) *Circuit {
@@ -35,7 +36,12 @@ func NewWithComplex(name string, isComplex bool) *Circuit {
 		Status:       &device.CircuitStatus{},
 		prevSolution: make(map[string]float64),
 		isComplex:    isComplex,
+		Models:       make(map[string]netlist.ModelParam),
 	}
+}
+
+func (c *Circuit) SetModels(models map[string]netlist.ModelParam) {
+	c.Models = models
 }
 
 func (c *Circuit) AssignNodeBranchMaps(elements []netlist.Element) error {
@@ -70,7 +76,8 @@ func (c *Circuit) CreateMatrix() {
 
 func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 	for _, elem := range elements {
-		dev, err := netlist.CreateDevice(elem, c.nodeMap)
+		// dev, err := netlist.CreateDevice(elem, c.nodeMap)
+		dev, err := netlist.CreateDevice(elem, c.nodeMap, c.Models)
 		if err != nil {
 			return fmt.Errorf("creating device %s: %v", elem.Name, err)
 		}

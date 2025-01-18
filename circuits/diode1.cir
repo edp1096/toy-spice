@@ -2,4 +2,4 @@
 .op
 vin 1 0 DC 5
 r1 1 2 1k
-d1 2 0 default
+d1 2 0 D

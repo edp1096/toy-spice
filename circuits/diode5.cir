@@ -1,0 +1,8 @@
+* Diode model params Test Circuit
+.model D1N4148 D (Is=4.352e-9 N=1.906 Rs=0.6458 Cj0=7.048e-13 M=0.3333 Vj=0.869 Fc=0.5 Isr=3.333e-9 Nr=2)
+
+V1 anode 0 DC 5
+R1 anode n1 1k
+D1 n1 0 D1N4148
+
+.op

@@ -82,6 +82,63 @@ func (d *Diode) thermalVoltage(temp float64) float64 {
 	return BOLTZMANN * temp / CHARGE
 }
 
+func (d *Diode) SetModelParameters(params map[string]float64) {
+	// Is (Saturation Current)
+	if is, ok := params["is"]; ok {
+		d.Is = is
+	}
+
+	// N (Emission Coefficient)
+	if n, ok := params["n"]; ok {
+		d.N = n
+	}
+
+	// Rs (Series Resistance)
+	if rs, ok := params["rs"]; ok {
+		d.Rs = rs
+	}
+
+	// Cj0 (Zero-bias junction capacitance)
+	if cj0, ok := params["cj0"]; ok {
+		d.Cj0 = cj0
+	}
+
+	// M (Grading coefficient)
+	if m, ok := params["m"]; ok {
+		d.M = m
+	}
+
+	// Vj (Junction potential)
+	if vj, ok := params["vj"]; ok {
+		d.Vj = vj
+	}
+
+	// Bv (Breakdown voltage)
+	if bv, ok := params["bv"]; ok {
+		d.Bv = bv
+	}
+
+	// Eg (Energy gap)
+	if eg, ok := params["eg"]; ok {
+		d.Eg = eg
+	}
+
+	// Xti (Saturation current temp. exp)
+	if xti, ok := params["xti"]; ok {
+		d.Xti = xti
+	}
+
+	// Tt (Transit time)
+	if tt, ok := params["tt"]; ok {
+		d.Tt = tt
+	}
+
+	// Fc (Forward-bias depletion capacitance coefficient)
+	if fc, ok := params["fc"]; ok {
+		d.Fc = fc
+	}
+}
+
 func (d *Diode) temperatureAdjustedIs(temp float64) float64 {
 	const REFTEMP = 300.15 // 27degC
 	vt := d.thermalVoltage(temp)
