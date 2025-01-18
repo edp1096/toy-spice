@@ -70,7 +70,7 @@ var unitMap = map[string]float64{
 	"f":   1e-15, // femto
 }
 
-func Parse(input string) (*NetlistData, error) {
+func ParseNotUse(input string) (*NetlistData, error) {
 	scanner := bufio.NewScanner(strings.NewReader(input))
 	netlistData := &NetlistData{
 		Nodes:  make(map[string]int),
@@ -96,7 +96,7 @@ func Parse(input string) (*NetlistData, error) {
 		}
 
 		if strings.HasPrefix(line, ".") { // Analysis type
-			err := parseAnalysis(netlistData, line)
+			err := parseDotOperator(netlistData, line)
 			if err != nil {
 				return nil, err
 			}
@@ -120,8 +120,93 @@ func Parse(input string) (*NetlistData, error) {
 	return netlistData, nil
 }
 
-// Parse .op, .tran, .ac
-func parseAnalysis(netlistData *NetlistData, line string) error {
+func Parse(input string) (*NetlistData, error) {
+	scanner := bufio.NewScanner(strings.NewReader(input))
+	netlistData := &NetlistData{
+		Nodes:  make(map[string]int),
+		Models: make(map[string]device.ModelParam),
+	}
+
+	// Title or comment
+	if scanner.Scan() {
+		netlistData.Title = strings.TrimPrefix(scanner.Text(), "*")
+		netlistData.Title = strings.TrimSpace(netlistData.Title)
+	}
+
+	var currentLine string
+	for scanner.Scan() {
+		line := scanner.Text()
+		line = strings.TrimSpace(line)
+
+		if len(line) == 0 { // Empty line
+			if currentLine != "" {
+				// Process gathered line
+				if err := parseLine(netlistData, currentLine); err != nil {
+					return nil, err
+				}
+				currentLine = ""
+			}
+			continue
+		}
+
+		if strings.HasPrefix(line, "*") { // Comment
+			if currentLine != "" {
+				// Process gathered line before comment
+				if err := parseLine(netlistData, currentLine); err != nil {
+					return nil, err
+				}
+				currentLine = ""
+			}
+			continue
+		}
+
+		if strings.HasPrefix(line, "+") { // Line continue
+			// Change "+" to space to maintain separation
+			line = " " + strings.TrimSpace(line[1:])
+			currentLine += line
+			continue
+		}
+
+		// Process any gathered line before starting new one
+		if currentLine != "" {
+			if err := parseLine(netlistData, currentLine); err != nil {
+				return nil, err
+			}
+		}
+		currentLine = line
+	}
+
+	// Process final line if exists
+	if currentLine != "" {
+		if err := parseLine(netlistData, currentLine); err != nil {
+			return nil, err
+		}
+	}
+
+	return netlistData, nil
+}
+
+func parseLine(netlistData *NetlistData, line string) error {
+	if strings.HasPrefix(line, ".") { // Analysis type
+		return parseDotOperator(netlistData, line)
+	}
+
+	element, err := parseElement(line)
+	if err != nil {
+		return err
+	}
+
+	netlistData.Elements = append(netlistData.Elements, *element)
+	for _, node := range element.Nodes {
+		if _, exists := netlistData.Nodes[node]; !exists {
+			netlistData.Nodes[node] = len(netlistData.Nodes)
+		}
+	}
+	return nil
+}
+
+// Parse .op, .tran, .ac, .model
+func parseDotOperator(netlistData *NetlistData, line string) error {
 	var err error
 
 	fields := strings.Fields(line)
