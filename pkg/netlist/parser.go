@@ -147,10 +147,12 @@ func parseAnalysis(ckt *Circuit, line string) error {
 		if len(fields) < 3 {
 			return fmt.Errorf("insufficient tran parameters, need at least tstep and tstop")
 		}
-		if ckt.TranParam.TStep, err = ParseValue(fields[1]); err != nil {
+		ckt.TranParam.TStep, err = ParseValue(fields[1])
+		if err != nil {
 			return fmt.Errorf("invalid tstep: %v", err)
 		}
-		if ckt.TranParam.TStop, err = ParseValue(fields[2]); err != nil {
+		ckt.TranParam.TStop, err = ParseValue(fields[2])
+		if err != nil {
 			return fmt.Errorf("invalid tstop: %v", err)
 		}
 
@@ -160,12 +162,14 @@ func parseAnalysis(ckt *Circuit, line string) error {
 				continue
 			}
 			if i == 3 {
-				if ckt.TranParam.TStart, err = ParseValue(fields[i]); err != nil {
+				ckt.TranParam.TStart, err = ParseValue(fields[i])
+				if err != nil {
 					return fmt.Errorf("invalid tstart: %v", err)
 				}
 			}
 			if i == 4 {
-				if ckt.TranParam.TMax, err = ParseValue(fields[i]); err != nil {
+				ckt.TranParam.TMax, err = ParseValue(fields[i])
+				if err != nil {
 					return fmt.Errorf("invalid tmax: %v", err)
 				}
 			}
@@ -186,13 +190,16 @@ func parseAnalysis(ckt *Circuit, line string) error {
 			return fmt.Errorf("invalid sweep type: %s", ckt.ACParam.Sweep)
 		}
 
-		if ckt.ACParam.Points, err = strconv.Atoi(fields[2]); err != nil {
+		ckt.ACParam.Points, err = strconv.Atoi(fields[2])
+		if err != nil {
 			return fmt.Errorf("invalid points number: %v", err)
 		}
-		if ckt.ACParam.FStart, err = ParseValue(fields[3]); err != nil {
+		ckt.ACParam.FStart, err = ParseValue(fields[3])
+		if err != nil {
 			return fmt.Errorf("invalid fstart: %v", err)
 		}
-		if ckt.ACParam.FStop, err = ParseValue(fields[4]); err != nil {
+		ckt.ACParam.FStop, err = ParseValue(fields[4])
+		if err != nil {
 			return fmt.Errorf("invalid fstop: %v", err)
 		}
 
@@ -205,13 +212,16 @@ func parseAnalysis(ckt *Circuit, line string) error {
 		// First source sweep
 		ckt.DCParam.Source1 = fields[1]
 		var err error
-		if ckt.DCParam.Start1, err = ParseValue(fields[2]); err != nil {
+		ckt.DCParam.Start1, err = ParseValue(fields[2])
+		if err != nil {
 			return fmt.Errorf("invalid start value: %v", err)
 		}
-		if ckt.DCParam.Stop1, err = ParseValue(fields[3]); err != nil {
+		ckt.DCParam.Stop1, err = ParseValue(fields[3])
+		if err != nil {
 			return fmt.Errorf("invalid stop value: %v", err)
 		}
-		if ckt.DCParam.Increment1, err = ParseValue(fields[4]); err != nil { // Step1을 Increment1으로 변경
+		ckt.DCParam.Increment1, err = ParseValue(fields[4]) // Step1을 Increment1으로 변경
+		if err != nil {
 			return fmt.Errorf("invalid increment value: %v", err)
 		}
 
@@ -582,24 +592,28 @@ func parseSinParams(params string) (offset, amplitude, freq, phase float64, err 
 	}
 
 	// DC offset
-	if offset, err = ParseValue(sinParams[0]); err != nil {
+	offset, err = ParseValue(sinParams[0])
+	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("invalid SIN offset: %v", err)
 	}
 
 	// Amplitude
-	if amplitude, err = ParseValue(sinParams[1]); err != nil {
+	amplitude, err = ParseValue(sinParams[1])
+	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("invalid SIN amplitude: %v", err)
 	}
 
 	// Frequency
-	if freq, err = ParseValue(sinParams[2]); err != nil {
+	freq, err = ParseValue(sinParams[2])
+	if err != nil {
 		return 0, 0, 0, 0, fmt.Errorf("invalid SIN frequency: %v", err)
 	}
 
 	// Phase
 	phase = 0.0
 	if len(sinParams) > 3 {
-		if phase, err = ParseValue(sinParams[3]); err != nil {
+		phase, err = ParseValue(sinParams[3])
+		if err != nil {
 			return 0, 0, 0, 0, fmt.Errorf("invalid SIN phase: %v", err)
 		}
 	}
@@ -614,37 +628,44 @@ func parsePulseParams(params string) (v1, v2, delay, rise, fall, pWidth, period 
 	}
 
 	// V1 - Initial value
-	if v1, err = ParseValue(pulseParams[0]); err != nil {
+	v1, err = ParseValue(pulseParams[0])
+	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE V1: %v", err)
 	}
 
 	// V2 - Pulsed value
-	if v2, err = ParseValue(pulseParams[1]); err != nil {
+	v2, err = ParseValue(pulseParams[1])
+	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE V2: %v", err)
 	}
 
 	// Delay time
-	if delay, err = ParseValue(pulseParams[2]); err != nil {
+	delay, err = ParseValue(pulseParams[2])
+	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE delay: %v", err)
 	}
 
 	// Rise time
-	if rise, err = ParseValue(pulseParams[3]); err != nil {
+	rise, err = ParseValue(pulseParams[3])
+	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE rise: %v", err)
 	}
 
 	// Fall time
-	if fall, err = ParseValue(pulseParams[4]); err != nil {
+	fall, err = ParseValue(pulseParams[4])
+	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE fall: %v", err)
 	}
 
 	// Pulse width
-	if pWidth, err = ParseValue(pulseParams[5]); err != nil {
+	pWidth, err = ParseValue(pulseParams[5])
+	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE width: %v", err)
 	}
 
 	// Period
-	if period, err = ParseValue(pulseParams[6]); err != nil {
+	period, err = ParseValue(pulseParams[6])
+	if err != nil {
 		return 0, 0, 0, 0, 0, 0, 0, fmt.Errorf("invalid PULSE period: %v", err)
 	}
 
@@ -663,11 +684,13 @@ func parsePWLParams(params string) (times []float64, values []float64, err error
 
 	for i := 0; i < numPoints; i++ {
 		// Time point
-		if times[i], err = ParseValue(pwlParams[2*i]); err != nil {
+		times[i], err = ParseValue(pwlParams[2*i])
+		if err != nil {
 			return nil, nil, fmt.Errorf("invalid PWL time[%d]: %v", i, err)
 		}
 		// Value point
-		if values[i], err = ParseValue(pwlParams[2*i+1]); err != nil {
+		values[i], err = ParseValue(pwlParams[2*i+1])
+		if err != nil {
 			return nil, nil, fmt.Errorf("invalid PWL value[%d]: %v", i, err)
 		}
 		// 시간은 단조 증가해야 함

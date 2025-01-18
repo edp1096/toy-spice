@@ -183,6 +183,8 @@ func printResults(results map[string][]float64) {
 }
 
 func procWithPrint() {
+	var err error
+
 	// 1. Open and read netlist
 	fmt.Printf("\n[1] Reading netlist file: %s\n", flag.Arg(0))
 	content, err := os.ReadFile(flag.Arg(0))
@@ -210,7 +212,8 @@ func procWithPrint() {
 	circuit := circuit.NewWithComplex(ckt.Title, isComplex)
 
 	// 3.1 Map nodes and branches
-	if err := circuit.AssignNodeBranchMaps(ckt.Elements); err != nil {
+	err = circuit.AssignNodeBranchMaps(ckt.Elements)
+	if err != nil {
 		log.Fatalf("Error creating circuit mappings: %v", err)
 	}
 
@@ -292,7 +295,8 @@ func procWithPrint() {
 	}
 
 	// 3.3 Create devices and stamp
-	if err := circuit.SetupDevices(ckt.Elements); err != nil {
+	err = circuit.SetupDevices(ckt.Elements)
+	if err != nil {
 		log.Fatalf("Error setting up devices: %v", err)
 	}
 	circuit.GetMatrix().PrintSystem() // Print sparse matrix
@@ -334,14 +338,16 @@ func procWithPrint() {
 		log.Fatal("Unsupported analysis type")
 	}
 
-	if err := analyzer.Setup(circuit); err != nil {
+	err = analyzer.Setup(circuit)
+	if err != nil {
 		log.Fatalf("Analysis setup failed: %v", err)
 	}
 	fmt.Println("Analyzer setup completed")
 
 	// 5. Run analysis
 	fmt.Println("\n[5] Executing analysis")
-	if err := analyzer.Execute(); err != nil {
+	err = analyzer.Execute()
+	if err != nil {
 		log.Fatalf("Analysis execution failed: %v", err)
 	}
 
@@ -351,6 +357,8 @@ func procWithPrint() {
 }
 
 func procWithoutPrint() {
+	var err error
+
 	// 1. Open and read netlist
 	content, err := os.ReadFile(flag.Arg(0))
 	if err != nil {
@@ -368,7 +376,8 @@ func procWithoutPrint() {
 	circuit := circuit.NewWithComplex(ckt.Title, isComplex)
 
 	// 3.1 Map nodes and branches
-	if err := circuit.AssignNodeBranchMaps(ckt.Elements); err != nil {
+	err = circuit.AssignNodeBranchMaps(ckt.Elements)
+	if err != nil {
 		log.Fatalf("Error creating circuit mappings: %v", err)
 	}
 
@@ -376,7 +385,8 @@ func procWithoutPrint() {
 	circuit.CreateMatrix()
 
 	// 3.3 Create devices and stamp
-	if err := circuit.SetupDevices(ckt.Elements); err != nil {
+	err = circuit.SetupDevices(ckt.Elements)
+	if err != nil {
 		log.Fatalf("Error setting up devices: %v", err)
 	}
 	// circuit.GetMatrix().PrintSystem()
@@ -415,12 +425,14 @@ func procWithoutPrint() {
 		log.Fatal("Unsupported analysis type")
 	}
 
-	if err := analyzer.Setup(circuit); err != nil {
+	err = analyzer.Setup(circuit)
+	if err != nil {
 		log.Fatalf("Analysis setup failed: %v", err)
 	}
 
 	// 5. Run analysis
-	if err := analyzer.Execute(); err != nil {
+	err = analyzer.Execute()
+	if err != nil {
 		log.Fatalf("Analysis execution failed: %v", err)
 	}
 

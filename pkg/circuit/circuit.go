@@ -75,6 +75,8 @@ func (c *Circuit) CreateMatrix() {
 }
 
 func (c *Circuit) SetupDevices(elements []netlist.Element) error {
+	var err error
+
 	for _, elem := range elements {
 		// dev, err := netlist.CreateDevice(elem, c.nodeMap)
 		dev, err := netlist.CreateDevice(elem, c.nodeMap, c.Models)
@@ -106,7 +108,8 @@ func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 
 	// Initial stamp
 	cktStatus := &device.CircuitStatus{Time: 0}
-	if err := c.Stamp(cktStatus); err != nil {
+	err = c.Stamp(cktStatus)
+	if err != nil {
 		return fmt.Errorf("initial stamping failed: %v", err)
 	}
 	c.matrix.SetupElements()
@@ -115,8 +118,11 @@ func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 }
 
 func (c *Circuit) Stamp(status *device.CircuitStatus) error {
+	var err error
+
 	for _, dev := range c.devices {
-		if err := dev.Stamp(c.matrix, status); err != nil {
+		err = dev.Stamp(c.matrix, status)
+		if err != nil {
 			return fmt.Errorf("stamping device %s: %v", dev.GetName(), err)
 		}
 	}
@@ -228,8 +234,11 @@ func (c *Circuit) GetNodeVoltage(nodeIdx int) float64 {
 }
 
 func (c *Circuit) UpdateNonlinearVoltages(solution []float64) error {
+	var err error
+
 	for _, dev := range c.nonlinearDevices {
-		if err := dev.UpdateVoltages(solution); err != nil {
+		err = dev.UpdateVoltages(solution)
+		if err != nil {
 			return fmt.Errorf("updating voltages: %v", err)
 		}
 	}

@@ -29,12 +29,16 @@ func NewAC(fStart, fStop float64, nPoints int, pType string) *ACAnalysis {
 }
 
 func (ac *ACAnalysis) Setup(ckt *circuit.Circuit) error {
+	var err error
+
 	ac.Circuit = ckt
 
-	if err := ac.op.Setup(ckt); err != nil {
+	err = ac.op.Setup(ckt)
+	if err != nil {
 		return fmt.Errorf("operating point setup error: %v", err)
 	}
-	if err := ac.op.Execute(); err != nil {
+	err = ac.op.Execute()
+	if err != nil {
 		return fmt.Errorf("operating point analysis error: %v", err)
 	}
 
@@ -57,11 +61,13 @@ func (ac *ACAnalysis) Execute() error {
 
 		mat := ac.Circuit.GetMatrix()
 		mat.Clear()
-		if err := ac.Circuit.Stamp(ac.Circuit.Status); err != nil {
+		err := ac.Circuit.Stamp(ac.Circuit.Status)
+		if err != nil {
 			return fmt.Errorf("stamping error at f=%g: %v", freq, err)
 		}
 
-		if err := mat.Solve(); err != nil {
+		err = mat.Solve()
+		if err != nil {
 			return fmt.Errorf("matrix solve error at f=%g: %v", freq, err)
 		}
 

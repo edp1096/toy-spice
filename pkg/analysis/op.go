@@ -21,6 +21,8 @@ func (op *OperatingPoint) Setup(ckt *circuit.Circuit) error {
 }
 
 func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
+	var err error
+
 	ckt := op.Circuit
 	mat := ckt.GetMatrix()
 	var oldSolution []float64
@@ -36,17 +38,19 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 
 		// First iteration have no previous solution so, skip
 		if iter > 0 {
-			if err := ckt.UpdateNonlinearVoltages(oldSolution); err != nil {
+			err = ckt.UpdateNonlinearVoltages(oldSolution)
+			if err != nil {
 				return fmt.Errorf("updating nonlinear voltages: %v", err)
 			}
 		}
 
-		if err := ckt.Stamp(cktStatus); err != nil {
+		err = ckt.Stamp(cktStatus)
+		if err != nil {
 			return fmt.Errorf("stamping error: %v", err)
 		}
 		mat.LoadGmin(gmin)
 
-		err := mat.Solve()
+		err = mat.Solve()
 		if err != nil {
 			return fmt.Errorf("matrix solve error: %v", err)
 		}

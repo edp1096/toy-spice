@@ -128,7 +128,9 @@ func (m *CircuitMatrix) Clear() {
 
 func (m *CircuitMatrix) Solve() error {
 	var err error
-	if err = m.matrix.Factor(); err != nil {
+
+	err = m.matrix.Factor()
+	if err != nil {
 		return fmt.Errorf("matrix factorization failed: %v", err)
 	}
 

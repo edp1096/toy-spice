@@ -85,6 +85,8 @@ func (dc *DCSweep) Execute() error {
 }
 
 func (dc *DCSweep) singleSweep() error {
+	var err error
+
 	sourceName := dc.sourceNames[0]
 
 	// Find the source device
@@ -116,11 +118,12 @@ func (dc *DCSweep) singleSweep() error {
 		mat := dc.Circuit.GetMatrix()
 		mat.Clear()
 
-		if err := dc.Circuit.Stamp(status); err != nil {
+		err = dc.Circuit.Stamp(status)
+		if err != nil {
 			return fmt.Errorf("stamping error at %s=%g: %v", sourceName, val, err)
 		}
 
-		err := dc.doNRiter(0, dc.convergence.maxIter)
+		err = dc.doNRiter(0, dc.convergence.maxIter)
 		if err != nil {
 			return fmt.Errorf("convergence error at %s=%g: %v", sourceName, val, err)
 		}
@@ -136,6 +139,8 @@ func (dc *DCSweep) singleSweep() error {
 }
 
 func (dc *DCSweep) doNRiter(gmin float64, maxIter int) error {
+	var err error
+
 	ckt := dc.Circuit
 	mat := ckt.GetMatrix()
 	var oldSolution []float64
@@ -149,17 +154,20 @@ func (dc *DCSweep) doNRiter(gmin float64, maxIter int) error {
 	for iter := 0; iter < maxIter; iter++ {
 		mat.Clear()
 		if iter > 0 {
-			if err := ckt.UpdateNonlinearVoltages(oldSolution); err != nil {
+			err := ckt.UpdateNonlinearVoltages(oldSolution)
+			if err != nil {
 				return fmt.Errorf("updating nonlinear voltages: %v", err)
 			}
 		}
 
-		if err := ckt.Stamp(cktStatus); err != nil {
+		err = ckt.Stamp(cktStatus)
+		if err != nil {
 			return fmt.Errorf("stamping error: %v", err)
 		}
 
 		mat.LoadGmin(gmin)
-		if err := mat.Solve(); err != nil {
+		err := mat.Solve()
+		if err != nil {
 			return fmt.Errorf("matrix solve error: %v", err)
 		}
 
@@ -194,6 +202,8 @@ func (dc *DCSweep) StoreResult(sweepVal float64, solution map[string]float64) {
 }
 
 func (dc *DCSweep) nestedSweep() error {
+	var err error
+
 	source1Name := dc.sourceNames[0]
 	source2Name := dc.sourceNames[1]
 
@@ -233,12 +243,13 @@ func (dc *DCSweep) nestedSweep() error {
 			mat := dc.Circuit.GetMatrix()
 			mat.Clear()
 
-			if err := dc.Circuit.Stamp(status); err != nil {
+			err = dc.Circuit.Stamp(status)
+			if err != nil {
 				return fmt.Errorf("stamping error at %s=%g, %s=%g: %v",
 					source1Name, val1, source2Name, val2, err)
 			}
 
-			err := dc.doNRiter(0, dc.convergence.maxIter)
+			err = dc.doNRiter(0, dc.convergence.maxIter)
 			if err != nil {
 				return fmt.Errorf("convergence error at %s=%g, %s=%g: %v",
 					source1Name, val1, source2Name, val2, err)

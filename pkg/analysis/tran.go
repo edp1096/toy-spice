@@ -47,13 +47,17 @@ func NewTransient(tStart, tStop, tStep, tMax float64, uic bool) *Transient {
 }
 
 func (tr *Transient) Setup(ckt *circuit.Circuit) error {
+	var err error
+
 	tr.Circuit = ckt
 
 	if !tr.useUIC {
-		if err := tr.op.Setup(ckt); err != nil {
+		err = tr.op.Setup(ckt)
+		if err != nil {
 			return fmt.Errorf("operating point setup error: %v", err)
 		}
-		if err := tr.op.Execute(); err != nil {
+		err = tr.op.Execute()
+		if err != nil {
 			return fmt.Errorf("operating point analysis error: %v", err)
 		}
 	}
@@ -114,6 +118,8 @@ func (tr *Transient) Execute() error {
 }
 
 func (tr *Transient) doNRiter(gmin float64, maxIter int) error {
+	var err error
+
 	ckt := tr.Circuit
 	mat := ckt.GetMatrix()
 	var oldSolution []float64
@@ -129,16 +135,19 @@ func (tr *Transient) doNRiter(gmin float64, maxIter int) error {
 	for iter := 0; iter < maxIter; iter++ {
 		mat.Clear()
 		if iter > 0 {
-			if err := ckt.UpdateNonlinearVoltages(oldSolution); err != nil {
+			err = ckt.UpdateNonlinearVoltages(oldSolution)
+			if err != nil {
 				return fmt.Errorf("updating nonlinear voltages: %v", err)
 			}
 		}
 
-		if err := ckt.Stamp(cktStatus); err != nil {
+		err = ckt.Stamp(cktStatus)
+		if err != nil {
 			return fmt.Errorf("stamping error: %v", err)
 		}
 		mat.LoadGmin(gmin)
-		if err := mat.Solve(); err != nil {
+		err = mat.Solve()
+		if err != nil {
 			return fmt.Errorf("matrix solve error: %v", err)
 		}
 
