@@ -1,6 +1,10 @@
 * Diode Reverse Recovery Test Circuit
-.tran 1ns 100ns uic
-vpulse 1 0 pulse(1 -1 0 1ns 1ns 20ns 40ns)  ; 1V/-1V, tr=tf=1ns, PWdth=20ns, Period=40ns
+.model MY_D D Tt=5n
+
+* 1V/-1V, td=20ns, tr=tf=1ns, PWdth=20ns, Period=40ns
+vpulse 1 0 pulse(1 -1 20ns 1ns 1ns 20ns 40ns)
 d1 1 2 MY_D
 r1 2 0 50
-.model MY_D D Tt=5n
+
+*.op
+.tran 1ns 100ns

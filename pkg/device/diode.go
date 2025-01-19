@@ -3,6 +3,7 @@ package device
 import (
 	"fmt"
 	"math"
+	"toy-spice/internal/consts"
 	"toy-spice/pkg/matrix"
 )
 
@@ -25,13 +26,15 @@ type Diode struct {
 	Fc  float64 // Forward-bias depletion capacitance coefficient
 
 	// Internal states for Operating Point
-	vd float64 // Voltage
-	id float64 // Current
-	gd float64 // Conductance at Operating Point
+	vd     float64 // Voltage
+	id     float64 // Current
+	charge float64 // charge
+	gd     float64 // Conductance at Operating Point
 
 	// Status for Transient analysis
-	vdOld      float64 // Previous voltage
-	idOld      float64 // Previous current
+	prevVd     float64 // Previous voltage
+	prevId     float64 // Previous current
+	prevCharge float64 // Previous charge
 	capCurrent float64 // Capacitive current
 }
 
@@ -70,16 +73,11 @@ func (d *Diode) setDefaultParameters() {
 }
 
 func (d *Diode) thermalVoltage(temp float64) float64 {
-	const (
-		CHARGE    = 1.6021918e-19 // Electron charge (C)
-		BOLTZMANN = 1.3806226e-23 // Boltzmann constant (J/K)
-	)
-
 	if temp <= 0 {
 		temp = 300.15
 	}
 
-	return BOLTZMANN * temp / CHARGE
+	return consts.BOLTZMANN * temp / consts.CHARGE
 }
 
 func (d *Diode) SetModelParameters(params map[string]float64) {
@@ -140,12 +138,12 @@ func (d *Diode) SetModelParameters(params map[string]float64) {
 }
 
 func (d *Diode) temperatureAdjustedIs(temp float64) float64 {
-	const REFTEMP = 300.15 // 27degC
+	const ktemp = consts.KELVIN + 27 // 27degC
 	vt := d.thermalVoltage(temp)
 
 	// is(T2) = is(T1) * (T2/T1)^(XTI/N) * exp(-(Eg/(2*k))*(1/T2 - 1/T1))
-	ratio := temp / REFTEMP
-	egfact := -d.Eg / (2 * vt) * (temp/REFTEMP - 1.0)
+	ratio := temp / ktemp
+	egfact := -d.Eg / (2 * vt) * (temp/ktemp - 1.0)
 
 	return d.Is * math.Pow(ratio, d.Xti/d.N) * math.Exp(egfact)
 }
@@ -208,7 +206,7 @@ func (d *Diode) diffusionCapacitance(vd float64, temp float64, timeStep float64)
 	id := d.calculateCurrent(vd, temp)
 
 	// dI/dt
-	didt := (id - d.idOld) / timeStep
+	didt := (id - d.prevId) / timeStep
 
 	// Transit Time capacitance: Cd = Tt * dI/dt
 	return d.Tt * didt
@@ -224,21 +222,22 @@ func (d *Diode) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 		return fmt.Errorf("diode %s: requires exactly 2 nodes", d.Name)
 	}
 
-	n1, n2 := d.Nodes[0], d.Nodes[1]
-
-	// vt := d.thermalVoltage(status.Temp)
-	// d.id = d.calculateCurrent(d.vd, vt)
-	// d.gd = d.calculateConductance(d.vd, d.id, vt)
 	d.id = d.calculateCurrent(d.vd, status.Temp)
 	d.gd = d.calculateConductance(d.vd, d.id, status.Temp)
 
-	// Diffusion capacitance
-	if status.Mode == TransientAnalysis && status.TimeStep > 0 {
-		cd := d.diffusionCapacitance(d.vd, status.Temp, status.TimeStep)
-		// Add capacitive current to total current
-		d.capCurrent = cd * (d.vd - d.vdOld) / status.TimeStep
-		d.id += d.capCurrent
+	if status.Mode == TransientAnalysis {
+		d.charge = d.Tt * d.id
+
+		if status.TimeStep > 0 {
+			d.capCurrent = (d.charge - d.prevCharge) / status.TimeStep
+			geq := d.Tt * d.gd / status.TimeStep
+
+			d.gd += geq
+			d.id += d.capCurrent
+		}
 	}
+
+	n1, n2 := d.Nodes[0], d.Nodes[1]
 
 	if n1 != 0 {
 		matrix.AddElement(n1, n1, d.gd)
@@ -327,13 +326,14 @@ func (d *Diode) LoadCurrent(matrix matrix.DeviceMatrix) error {
 func (d *Diode) SetTimeStep(dt float64) {}
 
 func (d *Diode) UpdateState(voltages []float64, status *CircuitStatus) {
-	d.vdOld = d.vd
-	d.idOld = d.id - d.capCurrent // Store DC current only
+	d.prevVd = d.vd
+	d.prevId = d.id - d.capCurrent // Store DC current only
+	d.prevCharge = d.charge
 	d.capCurrent = 0.0
 }
 
 func (d *Diode) CalculateLTE(voltages map[string]float64, status *CircuitStatus) float64 {
-	return math.Abs(d.vd - d.vdOld)
+	return math.Abs(d.vd - d.prevVd)
 }
 
 func (d *Diode) UpdateVoltages(voltages []float64) error {

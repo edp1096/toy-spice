@@ -70,56 +70,6 @@ var unitMap = map[string]float64{
 	"f":   1e-15, // femto
 }
 
-func ParseNotUse(input string) (*NetlistData, error) {
-	scanner := bufio.NewScanner(strings.NewReader(input))
-	netlistData := &NetlistData{
-		Nodes:  make(map[string]int),
-		Models: make(map[string]device.ModelParam),
-	}
-
-	// Title or comment
-	if scanner.Scan() {
-		netlistData.Title = strings.TrimPrefix(scanner.Text(), "*")
-		netlistData.Title = strings.TrimSpace(netlistData.Title)
-	}
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		line = strings.TrimSpace(line)
-
-		if len(line) == 0 { // Empty line
-			continue
-		}
-
-		if strings.HasPrefix(line, "*") { // Comment
-			continue
-		}
-
-		if strings.HasPrefix(line, ".") { // Analysis type
-			err := parseDotOperator(netlistData, line)
-			if err != nil {
-				return nil, err
-			}
-			continue
-		}
-
-		element, err := parseElement(line)
-		if err != nil {
-			return nil, err
-		}
-
-		netlistData.Elements = append(netlistData.Elements, *element)
-
-		for _, node := range element.Nodes {
-			if _, exists := netlistData.Nodes[node]; !exists {
-				netlistData.Nodes[node] = len(netlistData.Nodes)
-			}
-		}
-	}
-
-	return netlistData, nil
-}
-
 func Parse(input string) (*NetlistData, error) {
 	scanner := bufio.NewScanner(strings.NewReader(input))
 	netlistData := &NetlistData{
