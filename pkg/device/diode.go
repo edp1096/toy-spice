@@ -81,59 +81,24 @@ func (d *Diode) thermalVoltage(temp float64) float64 {
 }
 
 func (d *Diode) SetModelParameters(params map[string]float64) {
-	// Is (Saturation Current)
-	if is, ok := params["is"]; ok {
-		d.Is = is
+	paramsSet := map[string]*float64{
+		"is":  &d.Is,  // Is (Saturation Current)
+		"n":   &d.N,   // N (Emission Coefficient)
+		"rs":  &d.Rs,  // Rs (Series Resistance)
+		"cj0": &d.Cj0, // Cj0 (Zero-bias junction capacitance)
+		"m":   &d.M,   // M (Grading coefficient)
+		"vj":  &d.Vj,  // Vj (Junction potential)
+		"bv":  &d.Bv,  // Bv (Breakdown voltage)
+		"eg":  &d.Eg,  // Eg (Energy gap)
+		"xti": &d.Xti, // Xti (Saturation current temp. exp)
+		"tt":  &d.Tt,  // Tt (Transit time)
+		"fc":  &d.Fc,  // Fc (Forward-bias depletion capacitance coefficient)
 	}
 
-	// N (Emission Coefficient)
-	if n, ok := params["n"]; ok {
-		d.N = n
-	}
-
-	// Rs (Series Resistance)
-	if rs, ok := params["rs"]; ok {
-		d.Rs = rs
-	}
-
-	// Cj0 (Zero-bias junction capacitance)
-	if cj0, ok := params["cj0"]; ok {
-		d.Cj0 = cj0
-	}
-
-	// M (Grading coefficient)
-	if m, ok := params["m"]; ok {
-		d.M = m
-	}
-
-	// Vj (Junction potential)
-	if vj, ok := params["vj"]; ok {
-		d.Vj = vj
-	}
-
-	// Bv (Breakdown voltage)
-	if bv, ok := params["bv"]; ok {
-		d.Bv = bv
-	}
-
-	// Eg (Energy gap)
-	if eg, ok := params["eg"]; ok {
-		d.Eg = eg
-	}
-
-	// Xti (Saturation current temp. exp)
-	if xti, ok := params["xti"]; ok {
-		d.Xti = xti
-	}
-
-	// Tt (Transit time)
-	if tt, ok := params["tt"]; ok {
-		d.Tt = tt
-	}
-
-	// Fc (Forward-bias depletion capacitance coefficient)
-	if fc, ok := params["fc"]; ok {
-		d.Fc = fc
+	for key, param := range paramsSet {
+		if value, ok := params[key]; ok {
+			*param = value
+		}
 	}
 }
 
