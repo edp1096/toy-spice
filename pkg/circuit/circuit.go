@@ -76,9 +76,14 @@ func (c *Circuit) CreateMatrix() {
 
 func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 	var err error
+	// 디바이스 맵 추가
+	deviceMap := make(map[string]device.Device)
 
+	// 상호 인덕턴스를 제외한 모든 디바이스 생성
 	for _, elem := range elements {
-		// dev, err := netlist.CreateDevice(elem, c.nodeMap)
+		if elem.Type == "K" {
+			continue // 상호 인덕턴스는 나중에 처리
+		}
 		dev, err := netlist.CreateDevice(elem, c.nodeMap, c.Models)
 		if err != nil {
 			return fmt.Errorf("creating device %s: %v", elem.Name, err)
@@ -95,12 +100,45 @@ func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 		}
 		dev.SetNodes(nodeIndices)
 
+		// 전압원 브랜치 인덱스 설정
 		if v, ok := dev.(*device.VoltageSource); ok {
 			v.SetBranchIndex(c.branchMap[elem.Name])
 		}
 
+		// 비선형 디바이스 처리
 		if nl, ok := dev.(device.NonLinear); ok {
 			c.nonlinearDevices = append(c.nonlinearDevices, nl)
+		}
+
+		// 디바이스 맵과 배열에 추가
+		deviceMap[elem.Name] = dev
+		c.devices = append(c.devices, dev)
+	}
+
+	// 상호 인덕턴스 처리
+	for _, elem := range elements {
+		if elem.Type != "K" {
+			continue
+		}
+		dev, err := netlist.CreateDevice(elem, c.nodeMap, c.Models)
+		if err != nil {
+			return fmt.Errorf("creating mutual coupling %s: %v", elem.Name, err)
+		}
+
+		mutual := dev.(*device.Mutual)
+		for i, name := range mutual.GetInductorNames() {
+			ind, ok := deviceMap[name]
+			if !ok {
+				return fmt.Errorf("inductor %s not found for mutual coupling %s", name, mutual.GetName())
+			}
+			indComp, ok := ind.(device.InductorComponent)
+			if !ok {
+				return fmt.Errorf("device %s is not an inductor component", name)
+			}
+			err = mutual.SetInductor(i, indComp)
+			if err != nil {
+				return fmt.Errorf("setting inductor %s in mutual coupling %s: %v", name, mutual.GetName(), err)
+			}
 		}
 
 		c.devices = append(c.devices, dev)

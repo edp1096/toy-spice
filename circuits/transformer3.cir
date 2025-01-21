@@ -1,0 +1,22 @@
+* Nonlinear Transformer Test Circuit with 2:1 ratio
+Vin 1 0 sin(0 10 1k)
+
+Rp_leak 1 2 0.1
+Lp 2 0 core=CORE1 turns=200
+
+Rs_leak 3 4 0.05
+Ls 3 0 core=CORE1 turns=100
+Rload 4 0 1000
+
+.model CORE1 core(
++ ms=1.6e6
++ alpha=1e-3
++ a=1000
++ c=0.1
++ k=2000
++ area=1e-4
++ len=0.1)
+
+K1 Lp Ls 0.95
+
+.tran 10u 3m

@@ -105,3 +105,11 @@ func (l *Inductor) UpdateState(voltages []float64, status *CircuitStatus) {
 func (l *Inductor) CalculateLTE(voltages map[string]float64, status *CircuitStatus) float64 {
 	return math.Abs(l.Current0-l.Current1) / (2.0 * status.TimeStep)
 }
+
+func (l *Inductor) GetCurrent() float64 {
+	return l.Current0
+}
+
+func (l *Inductor) GetVoltage() float64 {
+	return l.Voltage0
+}

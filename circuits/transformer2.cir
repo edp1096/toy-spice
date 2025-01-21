@@ -1,0 +1,17 @@
+* Transformer Test Circuit with 2:1 ratio
+Vin 1 0 sin(0 10 1k)
+
+Rp_leak 1 2 0.1
+Lp 2 0 200m
+
+Ls1 3 0 50m
+Rs1_leak 3 4 0.05
+Rload1 4 0 100
+
+Ls2 5 0 50m
+Rs2_leak 5 6 0.05
+Rload2 6 0 100
+
+K1 Lp Ls1 Ls2 0.95
+
+.tran 10u 3m

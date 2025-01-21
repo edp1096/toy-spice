@@ -43,6 +43,14 @@ type NonLinear interface {
 	UpdateVoltages(voltages []float64) error
 }
 
+type InductorComponent interface {
+	Device
+	GetValue() float64
+	GetCurrent() float64
+	GetVoltage() float64
+	GetNodes() []int
+}
+
 type SourceType int
 
 const (
