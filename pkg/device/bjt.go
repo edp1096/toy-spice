@@ -289,18 +289,19 @@ func (b *Bjt) calculateChargeFactors(vbe, vbc, iF, iR float64) float64 {
 func (b *Bjt) calculateConductances(vbe, vbc, ic, ib, temp float64) (float64, float64, float64, float64) {
 	vt := b.thermalVoltage(temp)
 	is_t := b.temperatureAdjustedIs(temp)
-
-	// 최소값 보장
 	const gmin = 1e-12
 
-	// Transconductance
-	gm := math.Max(math.Abs(ic)/(b.Nf*vt)+is_t/(b.Nf*vt), gmin)
+	// Transconductance - 단순화된 형태로
+	gm := math.Max(math.Abs(ic)/(b.Nf*vt), gmin)
 
-	// Input conductance
-	gpi := math.Max(math.Abs(ib)/(b.Nf*vt)+is_t/(b.Nf*vt), gmin)
+	// Input conductance - 단순화된 형태로
+	gpi := math.Max(math.Abs(ib)/(b.Nf*vt), gmin)
 
-	// Reverse transconductance
-	gmu := math.Max(is_t/(b.Nr*vt), gmin)
+	// Reverse transconductance - SpiceSharp 스타일
+	gmu := gmin
+	if vbc > -3.0*b.Nr*vt {
+		gmu = math.Max(is_t*math.Exp(vbc/(b.Nr*vt))/(b.Nr*vt), gmin)
+	}
 
 	// Output conductance
 	gout := gmin
@@ -312,45 +313,21 @@ func (b *Bjt) calculateConductances(vbe, vbc, ic, ib, temp float64) (float64, fl
 }
 
 func (b *Bjt) calculateCapacitances(vbe, vbc float64) (float64, float64) {
-	// B-E depletion capacitance
-	cbe := b.Cje
-	if b.Cje > 0 {
-		if vbe < b.Fc*b.Vje {
-			// Normal region
-			arg := 1.0 - vbe/b.Vje
-			if arg < 0.1 {
-				arg = 0.1
-			}
-			cbe /= math.Pow(arg, b.Mje)
-		} else {
-			// Forward-bias region (above Fc*Vje)
-			f1 := b.Vje * (1 - math.Pow(b.Fc, 1-b.Mje)) / (1 - b.Mje)
-			f2 := math.Pow(b.Fc, -b.Mje)
-			f3 := 1 - b.Fc*(1+b.Mje) + b.Mje*vbe/b.Vje
-			cbe *= f2 * (1 + f3/f1)
-		}
+	// Junction capacitances
+	cje := b.Cje // Base-Emitter junction capacitance
+	cjc := b.Cjc // Base-Collector junction capacitance
+
+	// Add diffusion capacitance from transit time
+	if b.Tf > 0 {
+		// Forward diffusion capacitance = Tf * gm
+		cje += b.Tf * b.gm
+	}
+	if b.Tr > 0 {
+		// Reverse diffusion capacitance = Tr * gmu
+		cjc += b.Tr * b.gmu
 	}
 
-	// B-C depletion capacitance
-	cbc := b.Cjc
-	if b.Cjc > 0 {
-		if vbc < b.Fc*b.Vjc {
-			// Normal region
-			arg := 1.0 - vbc/b.Vjc
-			if arg < 0.1 {
-				arg = 0.1
-			}
-			cbc /= math.Pow(arg, b.Mjc)
-		} else {
-			// Forward-bias region (above Fc*Vjc)
-			f1 := b.Vjc * (1 - math.Pow(b.Fc, 1-b.Mjc)) / (1 - b.Mjc)
-			f2 := math.Pow(b.Fc, -b.Mjc)
-			f3 := 1 - b.Fc*(1+b.Mjc) + b.Mjc*vbc/b.Vjc
-			cbc *= f2 * (1 + f3/f1)
-		}
-	}
-
-	return cbe, cbc
+	return cje, cjc
 }
 
 func (b *Bjt) calculateCharges(vbe, vbc, ic, temp float64) (float64, float64) {
@@ -386,47 +363,46 @@ func (b *Bjt) calculateStorageTime(vbe, vbc, ic, temp float64) float64 {
 }
 
 func (b *Bjt) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
-	if len(b.Nodes) != 3 {
-		return fmt.Errorf("bjt %s: requires exactly 3 nodes", b.Name)
+	if status.Mode == ACAnalysis {
+		return b.StampAC(matrix, status)
 	}
 
-	// 1. Calculate operating point
+	// Get node indices
+	nc := b.Nodes[0] // Collector
+	nb := b.Nodes[1] // Base
+	ne := b.Nodes[2] // Emitter
+
+	// Initial bias point
+	if b.vbe == 0 && b.vce == 0 {
+		b.vbe = 0.7 // typical silicon BJT Vbe
+		b.vce = 0.3 // between saturation and active
+		b.vbc = b.vbe - b.vce
+		return nil
+	}
+
+	// Calculate currents and conductances
 	b.ic, b.ib, b.ie = b.calculateCurrents(b.vbe, b.vbc, status.Temp)
 	b.gm, b.gpi, b.gmu, b.gout = b.calculateConductances(b.vbe, b.vbc, b.ic, b.ib, status.Temp)
 
-	// 2. Add gmin
+	// Add minimum conductance for stability
 	gmin := status.Gmin
 	b.gpi += gmin
 	b.gmu += gmin
 	b.gout += gmin
 
-	// Get nodes
-	nc := b.Nodes[0] // Collector
-	nb := b.Nodes[1] // Base
-	ne := b.Nodes[2] // Emitter
-
-	// Debug prints
-	fmt.Printf("BJT %s voltages: vbe=%.6f vbc=%.6f\n", b.Name, b.vbe, b.vbc)
-	fmt.Printf("BJT %s currents: ic=%.6f ib=%.6f ie=%.6f\n", b.Name, b.ic, b.ib, b.ie)
-	fmt.Printf("BJT %s conductances: gm=%.6f gpi=%.6f gmu=%.6f gout=%.6f\n", b.Name, b.gm, b.gpi, b.gmu, b.gout)
-	fmt.Printf("BJT %s nodes: nc=%d nb=%d ne=%d\n", b.Name, nc, nb, ne)
-
-	// 3. Stamp matrix
+	// Stamp the matrix
 	if nc != 0 {
-		// Collector node equations
 		matrix.AddElement(nc, nc, b.gout+b.gmu)
 		if nb != 0 {
-			matrix.AddElement(nc, nb, -b.gmu+b.gm)
+			matrix.AddElement(nc, nb, -b.gmu)
 		}
 		if ne != 0 {
 			matrix.AddElement(nc, ne, -b.gout-b.gm)
 		}
-		// Collector current
-		matrix.AddRHS(nc, -(b.ic - b.gout*b.vce + b.gmu*b.vbc - b.gm*b.vbe))
+		matrix.AddRHS(nc, -(b.ic - b.gout*b.vce + b.gmu*b.vbc))
 	}
 
 	if nb != 0 {
-		// Base node equations
 		matrix.AddElement(nb, nb, b.gpi+b.gmu)
 		if nc != 0 {
 			matrix.AddElement(nb, nc, -b.gmu)
@@ -434,21 +410,18 @@ func (b *Bjt) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 		if ne != 0 {
 			matrix.AddElement(nb, ne, -b.gpi)
 		}
-		// Base current
-		matrix.AddRHS(nb, -(b.ib - b.gpi*b.vbe + b.gmu*b.vbc))
+		matrix.AddRHS(nb, -(b.ib + b.gmu*b.vbc + b.gpi*b.vbe))
 	}
 
 	if ne != 0 {
-		// Emitter node equations
-		matrix.AddElement(ne, ne, b.gout+b.gpi+b.gm)
+		matrix.AddElement(ne, ne, b.gout+b.gm+b.gpi)
 		if nc != 0 {
-			matrix.AddElement(ne, nc, -b.gout-b.gm)
+			matrix.AddElement(ne, nc, -b.gout)
 		}
 		if nb != 0 {
-			matrix.AddElement(ne, nb, -b.gpi)
+			matrix.AddElement(ne, nb, -b.gpi-b.gm)
 		}
-		// Emitter current
-		matrix.AddRHS(ne, -b.ie)
+		matrix.AddRHS(ne, -(b.ie + b.gout*b.vce + b.gpi*b.vbe + b.gm*b.vbe))
 	}
 
 	return nil
@@ -462,63 +435,33 @@ func (b *Bjt) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 	// Get nodes
 	nc := b.Nodes[0] // Collector
 	nb := b.Nodes[1] // Base
-	ne := b.Nodes[2] // Emitter
+	// ne := b.Nodes[2] // Emitter
 
-	// Calculate small-signal conductances at operating point
-	gm := b.gm     // Transconductance
-	gpi := b.gpi   // Input conductance
-	gmu := b.gmu   // Reverse transconductance
-	gout := b.gout // Output conductance
-
-	// Add capacitive effects
-	omega := 2 * math.Pi * status.Frequency
+	// Get capacitances at operating point
 	cbe, cbc := b.calculateCapacitances(b.vbe, b.vbc)
+	omega := 2 * math.Pi * status.Frequency
+	xcbc := omega * cbc
+	xcbe := omega * cbe
 
-	// Add parasitic resistances if present
-	if b.Rc > 0 || b.Re > 0 || b.Rb > 0 {
-		if nc != 0 && b.Rc > 0 {
-			matrix.AddComplexElement(nc, nc, 1.0/b.Rc, 0)
-		}
-		if ne != 0 && b.Re > 0 {
-			matrix.AddComplexElement(ne, ne, 1.0/b.Re, 0)
-		}
-		if nb != 0 && b.Rb > 0 {
-			matrix.AddComplexElement(nb, nb, 1.0/b.Rb, 0)
-		}
-	}
-
-	// Stamp matrix for AC analysis
-	if nc != 0 {
-		// Collector node
-		matrix.AddComplexElement(nc, nc, gout+gmu, omega*(cbc))
-		if nb != 0 {
-			matrix.AddComplexElement(nc, nb, -gmu+gm, -omega*(cbc))
-		}
-		if ne != 0 {
-			matrix.AddComplexElement(nc, ne, -gout-gm, 0)
-		}
-	}
-
+	// Y matrix elements
+	// y11 = base-base
 	if nb != 0 {
-		// Base node
-		matrix.AddComplexElement(nb, nb, gpi+gmu, omega*(cbe+cbc))
-		if nc != 0 {
-			matrix.AddComplexElement(nb, nc, -gmu, -omega*(cbc))
-		}
-		if ne != 0 {
-			matrix.AddComplexElement(nb, ne, -gpi, -omega*(cbe))
-		}
+		matrix.AddComplexElement(nb, nb, b.gpi+b.gmu, xcbe+xcbc)
 	}
 
-	if ne != 0 {
-		// Emitter node
-		if nc != 0 {
-			matrix.AddComplexElement(ne, nc, -gout-gm, 0)
-		}
-		if nb != 0 {
-			matrix.AddComplexElement(ne, nb, -gpi, -omega*(cbe))
-		}
-		matrix.AddComplexElement(ne, ne, gout+gpi+gm, omega*(cbe))
+	// y12 = base-collector
+	if nb != 0 && nc != 0 {
+		matrix.AddComplexElement(nb, nc, -b.gmu, -xcbc)
+	}
+
+	// y21 = collector-base
+	if nc != 0 && nb != 0 {
+		matrix.AddComplexElement(nc, nb, -b.gmu+b.gm, -xcbc)
+	}
+
+	// y22 = collector-collector
+	if nc != 0 {
+		matrix.AddComplexElement(nc, nc, b.gmu+b.gout, xcbc)
 	}
 
 	return nil
@@ -625,7 +568,7 @@ func (b *Bjt) limitExp(x float64) float64 {
 	return math.Exp(x)
 }
 
-func (b *Bjt) UpdateVoltages(voltages []float64) error {
+func (b *Bjt) UpdateVoltages(voltages []float64, status *CircuitStatus) error {
 	if len(b.Nodes) != 3 {
 		return fmt.Errorf("bjt %s: requires exactly 3 nodes", b.Name)
 	}
@@ -642,30 +585,86 @@ func (b *Bjt) UpdateVoltages(voltages []float64) error {
 		ve = voltages[b.Nodes[2]]
 	}
 
-	// 전압 제한
-	vt := b.thermalVoltage(300.15)
+	vt := b.thermalVoltage(status.Temp)
+	vbeNew := vb - ve
+	vbcNew := vb - vc
 
-	// B-E 접합
-	vbe := vb - ve
-	if vbe > 0.7 {
-		vbe = 0.7 + vt*math.Log(1.0+(vbe-0.7)/(2.0*vt))
-	} else if vbe < -0.6 {
-		vbe = -0.6
+	if status.Mode == OperatingPointAnalysis && status.IntegMode != PredictMode {
+		// Operating point convergence - strict limits
+		maxExp := 40.0
+
+		// Base-Emitter junction
+		arg := vbeNew / (b.Nf * vt)
+		if arg > maxExp {
+			vbeNew = maxExp * b.Nf * vt
+		} else if arg < -maxExp {
+			vbeNew = -maxExp * b.Nf * vt
+		}
+
+		// Base-Collector junction
+		arg = vbcNew / (b.Nr * vt)
+		if arg > maxExp {
+			vbcNew = maxExp * b.Nr * vt
+		} else if arg < -maxExp {
+			vbcNew = -maxExp * b.Nr * vt
+		}
+	} else {
+		// Initial phase - less strict limits
+		if vbeNew > 0.8 {
+			vbeNew = 0.8 + (vbeNew-0.8)/2
+		} else if vbeNew < -5.0 {
+			vbeNew = -5.0
+		}
+
+		if vbcNew > 0.8 {
+			vbcNew = 0.8 + (vbcNew-0.8)/2
+		} else if vbcNew < -5.0 {
+			vbcNew = -5.0
+		}
 	}
 
-	// B-C 접합
-	vbc := vb - vc
-	if vbc > 0.7 {
-		vbc = 0.7 + vt*math.Log(1.0+(vbc-0.7)/(2.0*vt))
-	} else if vbc < -0.6 {
-		vbc = -0.6
+	// Check if voltages changed significantly
+	const relTol = 1e-3
+	vbeDiff := math.Abs(vbeNew-b.vbe) / (math.Abs(b.vbe) + 1e-30)
+	vbcDiff := math.Abs(vbcNew-b.vbc) / (math.Abs(b.vbc) + 1e-30)
+
+	if vbeDiff > relTol || vbcDiff > relTol {
+		return fmt.Errorf("voltage limited: junction voltages changed significantly")
 	}
 
-	b.vbe = vbe
-	b.vbc = vbc
+	b.vbe = vbeNew
+	b.vbc = vbcNew
 	b.vce = vc - ve
 
 	return nil
+}
+
+// Junction voltage limiting like SPICE3F5's DEVpnjlim
+func (b *Bjt) limitJunction(vnew, vold, vt float64, initialPhase bool) (float64, bool) {
+	if initialPhase {
+		// 첫 번째 iteration에서는 더 관대한 제한
+		if vnew > 0.8 {
+			vnew = 0.8 + (vnew-0.8)/2
+			return vnew, true
+		}
+		if vnew < -5.0 {
+			vnew = -5.0
+			return vnew, true
+		}
+	} else {
+		// 수렴 단계에서는 지수함수 기반 제한
+		maxExp := 40.0
+		arg := vnew / (b.Nf * vt)
+		if arg > maxExp {
+			vnew = maxExp * b.Nf * vt
+			return vnew, true
+		}
+		if arg < -maxExp {
+			vnew = -maxExp * b.Nf * vt
+			return vnew, true
+		}
+	}
+	return vnew, false
 }
 
 // Called during circuit setup
