@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"toy-spice/pkg/device"
+	"toy-spice/pkg/util"
 )
 
 type AnalysisType int
@@ -453,7 +454,12 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		modelType = strings.ToUpper(typeField)
 	}
 
-	if modelType != "D" && modelType != "CORE" {
+	// if modelType != "D" && modelType != "CORE" {
+	// 	return fmt.Errorf("unsupported model type: %s", modelType)
+	// }
+	var supportedModelTypes = []string{"D", "CORE", "NPN", "PNP"}
+
+	if !util.SliceContains(supportedModelTypes, modelType) {
 		return fmt.Errorf("unsupported model type: %s", modelType)
 	}
 
@@ -497,6 +503,7 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		params["xti"] = 3.0  // Saturation current temp exp
 		params["tt"] = 0.0   // Transit time
 		params["fc"] = 0.5   // Forward-bias depletion capacitance coefficient
+
 	case "CORE":
 		// Jiles-Atherton model
 		params["ms"] = 1.6e6   // Saturation magnetization
@@ -508,6 +515,32 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		params["beta"] = 0.0   // Temperature coefficient
 		params["area"] = 1e-4  // Cross-sectional area
 		params["len"] = 0.1    // Mean path length
+
+	case "NPN", "PNP":
+		// BJT 기본 파라미터 설정
+		params["is"] = 1e-16  // Transport saturation current
+		params["bf"] = 100.0  // Ideal maximum forward beta
+		params["br"] = 1.0    // Ideal maximum reverse beta
+		params["nf"] = 1.0    // Forward emission coefficient
+		params["nr"] = 1.0    // Reverse emission coefficient
+		params["vaf"] = 100.0 // Forward Early voltage
+		params["var"] = 100.0 // Reverse Early voltage
+		params["ikf"] = 0.01  // Forward knee current
+		params["ikr"] = 0.01  // Reverse knee current
+		params["rc"] = 0.0    // Collector resistance
+		params["re"] = 0.0    // Emitter resistance
+		params["rb"] = 0.0    // Base resistance
+		params["cje"] = 0.0   // B-E junction capacitance
+		params["vje"] = 0.75  // B-E built-in potential
+		params["mje"] = 0.33  // B-E junction grading coefficient
+		params["cjc"] = 0.0   // B-C junction capacitance
+		params["vjc"] = 0.75  // B-C built-in potential
+		params["mjc"] = 0.33  // B-C junction grading coefficient
+		params["tf"] = 0.0    // Forward transit time
+		params["tr"] = 0.0    // Reverse transit time
+		params["xtb"] = 0.0   // Forward and reverse beta temp. exp
+		params["eg"] = 1.11   // Energy gap
+		params["xti"] = 3.0   // Temp. exponent for Is
 	}
 
 	// 파라미터 파싱
@@ -611,6 +644,16 @@ func parseElement(line string) (*Element, error) {
 			elem.Params["model"] = fields[3]
 		}
 
+		return elem, nil
+
+	case "Q":
+		if len(fields) < 4 {
+			return nil, fmt.Errorf("insufficient BJT parameters: need nodes and model name")
+		}
+		elem.Nodes = fields[1:4] // Collector, Base, Emitter
+		if len(fields) > 4 {
+			elem.Params["model"] = fields[4]
+		}
 		return elem, nil
 
 	default:
@@ -871,6 +914,15 @@ func CreateDevice(elem Element, nodeMap map[string]int, models map[string]device
 		}
 		return diode, nil
 
+	case "Q":
+		bjt := device.NewBJT(elem.Name, elem.Nodes)
+		if modelName, ok := elem.Params["model"]; ok {
+			if model, exists := models[modelName]; exists {
+				bjt.SetModelParameters(model.Params)
+			}
+		}
+		return bjt, nil
+
 	case "V":
 		switch elem.Params["type"] {
 		case "dc":
@@ -935,6 +987,7 @@ func CreateDevice(elem Element, nodeMap map[string]int, models map[string]device
 				return nil, fmt.Errorf("invalid AC phase: %v", err)
 			}
 			return device.NewACCurrentSource(elem.Name, elem.Nodes, 0, elem.Value, phase), nil
+
 		default:
 			return nil, fmt.Errorf("unsupported current source type: %s", elem.Params["type"])
 		}
