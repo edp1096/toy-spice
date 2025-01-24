@@ -428,40 +428,43 @@ func (b *Bjt) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 }
 
 func (b *Bjt) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
-	if len(b.Nodes) != 3 {
-		return fmt.Errorf("bjt %s: requires exactly 3 nodes", b.Name)
-	}
+	nc := b.Nodes[0]
+	nb := b.Nodes[1]
+	ne := b.Nodes[2]
 
-	// Get nodes
-	nc := b.Nodes[0] // Collector
-	nb := b.Nodes[1] // Base
-	// ne := b.Nodes[2] // Emitter
-
-	// Get capacitances at operating point
+	// Use stored conductances from DC operating point
 	cbe, cbc := b.calculateCapacitances(b.vbe, b.vbc)
 	omega := 2 * math.Pi * status.Frequency
-	xcbc := omega * cbc
-	xcbe := omega * cbe
 
-	// Y matrix elements
-	// y11 = base-base
+	// Y-parameters with stored conductances
 	if nb != 0 {
-		matrix.AddComplexElement(nb, nb, b.gpi+b.gmu, xcbe+xcbc)
+		matrix.AddComplexElement(nb, nb, b.gpi+b.gmu, omega*(cbe+cbc))
+		if nc != 0 {
+			matrix.AddComplexElement(nb, nc, -b.gmu, -omega*cbc)
+		}
+		if ne != 0 {
+			matrix.AddComplexElement(nb, ne, -b.gpi, -omega*cbe)
+		}
 	}
 
-	// y12 = base-collector
-	if nb != 0 && nc != 0 {
-		matrix.AddComplexElement(nb, nc, -b.gmu, -xcbc)
-	}
-
-	// y21 = collector-base
-	if nc != 0 && nb != 0 {
-		matrix.AddComplexElement(nc, nb, -b.gmu+b.gm, -xcbc)
-	}
-
-	// y22 = collector-collector
 	if nc != 0 {
-		matrix.AddComplexElement(nc, nc, b.gmu+b.gout, xcbc)
+		matrix.AddComplexElement(nc, nc, b.gout+b.gmu, omega*cbc)
+		if nb != 0 {
+			matrix.AddComplexElement(nc, nb, -b.gmu+b.gm, -omega*cbc)
+		}
+		if ne != 0 {
+			matrix.AddComplexElement(nc, ne, -b.gout-b.gm, 0)
+		}
+	}
+
+	if ne != 0 {
+		matrix.AddComplexElement(ne, ne, b.gout+b.gpi+b.gm, omega*cbe)
+		if nc != 0 {
+			matrix.AddComplexElement(ne, nc, -b.gout, 0)
+		}
+		if nb != 0 {
+			matrix.AddComplexElement(ne, nb, -b.gpi-b.gm, -omega*cbe)
+		}
 	}
 
 	return nil
