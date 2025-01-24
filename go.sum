@@ -1,2 +1,4 @@
 github.com/edp1096/sparse v0.0.0-20250106074045-bb7388245ee3 h1:s1UkFJXn4wIYQnkCJhldpJtiAQgCcwEVHw2ElsWl+EI=
 github.com/edp1096/sparse v0.0.0-20250106074045-bb7388245ee3/go.mod h1:BhC98SQ2+VqSk8aY7RUhlUPnThcaw+RlHWgwLfmU7Uw=
+github.com/edp1096/sparse v0.0.0-20250124102631-297f96d582b6 h1:Ztb9o5ovLF3SUTNKfcn0jYaCbArISTX+ZK78X77aqDE=
+github.com/edp1096/sparse v0.0.0-20250124102631-297f96d582b6/go.mod h1:BhC98SQ2+VqSk8aY7RUhlUPnThcaw+RlHWgwLfmU7Uw=
