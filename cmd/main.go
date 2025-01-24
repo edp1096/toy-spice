@@ -463,6 +463,6 @@ func main() {
 		log.Fatal("Usage: spice <netlist_file>")
 	}
 
-	procWithPrint()
-	// procWithoutPrint()
+	// procWithPrint()
+	procWithoutPrint()
 }

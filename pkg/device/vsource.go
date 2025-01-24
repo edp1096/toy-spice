@@ -160,10 +160,14 @@ func (v *VoltageSource) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatu
 	n1, n2 := v.Nodes[0], v.Nodes[1]
 	bIdx := v.branchIdx
 
-	acPhaseRad := v.acPhase * math.Pi / 180.0
-	voltageReal := v.acMag * math.Cos(acPhaseRad)
-	voltageImag := v.acMag * math.Sin(acPhaseRad)
+	// AC 위상을 라디안으로 변환
+	phaseRad := v.acPhase * math.Pi / 180.0
 
+	// 복소수 형태로 전압 설정: magnitude * (cos(θ) + j*sin(θ))
+	voltageReal := v.acMag * math.Cos(phaseRad)
+	voltageImag := v.acMag * math.Sin(phaseRad)
+
+	// 매트릭스 스탬핑
 	if n1 != 0 {
 		matrix.AddComplexElement(bIdx, n1, 1.0, 0.0)
 		matrix.AddComplexElement(n1, bIdx, 1.0, 0.0)
@@ -174,7 +178,6 @@ func (v *VoltageSource) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatu
 	}
 
 	matrix.AddComplexRHS(bIdx, voltageReal, voltageImag)
-
 	return nil
 }
 

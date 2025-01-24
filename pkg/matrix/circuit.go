@@ -94,8 +94,8 @@ func (m *CircuitMatrix) AddComplexRHS(i int, real, imag float64) {
 		m.rhs[i] += real
 		m.rhsImag[i] += imag
 	} else {
-		m.rhs[2*i-1] += real
-		m.rhs[2*i] += imag
+		m.rhs[2*i] += real
+		m.rhs[2*i+1] += imag
 	}
 }
 
@@ -181,21 +181,37 @@ func (m *CircuitMatrix) PrintSystem() {
 	for i := 1; i <= m.Size; i++ {
 		fmt.Printf("Equation %d:\n", i)
 		rowHasElements := false
-
 		for j := 1; j <= m.Size; j++ {
-			value := m.matrix.GetElement(int64(i), int64(j)).Real
-			if value != 0 {
-				fmt.Printf("  %+g*x%d ", value, j)
-				rowHasElements = true
+			element := m.matrix.GetElement(int64(i), int64(j))
+			if m.config.Complex {
+				if element.Real != 0 || element.Imag != 0 {
+					if element.Imag == 0 {
+						fmt.Printf("  %+g*x%d ", element.Real, j)
+					} else {
+						fmt.Printf("  (%g + j%g)*x%d ", element.Real, element.Imag, j)
+					}
+					rowHasElements = true
+				}
+			} else {
+				if element.Real != 0 {
+					fmt.Printf("  %+g*x%d ", element.Real, j)
+					rowHasElements = true
+				}
 			}
 		}
-
 		if rowHasElements {
-			fmt.Printf(" = %g\n", m.rhs[i])
+			if !m.config.Complex {
+				fmt.Printf(" = %g\n", m.rhs[i])
+			} else {
+				if !m.config.SeparatedComplexVectors {
+					fmt.Printf(" = %g + j%g\n", m.rhs[i], m.rhs[i+m.Size])
+				} else {
+					fmt.Printf(" = %g + j%g\n", m.rhs[i], m.rhsImag[i])
+				}
+			}
 		}
 	}
 
-	// m.printMatrixSummary()
 	m.matrix.Print(false, true, true)
 
 	fmt.Printf("RHS:\n")

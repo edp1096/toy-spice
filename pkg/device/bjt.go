@@ -435,27 +435,21 @@ func (b *Bjt) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 	cbe, cbc := b.calculateCapacitances(b.vbe, b.vbc)
 	omega := 2 * math.Pi * status.Frequency
 
-	fmt.Printf("\nBJT AC Analysis at f=%g Hz (omega=%g rad/s):\n", status.Frequency, omega)
-	fmt.Printf("DC Operating Point Values:\n")
-	fmt.Printf("gm=%g, gpi=%g, gmu=%g, gout=%g\n", b.gm, b.gpi, b.gmu, b.gout)
-	fmt.Printf("Capacitances: cbe=%g, cbc=%g\n", cbe, cbc)
-	fmt.Printf("Nodes: nc=%d, nb=%d, ne=%d\n", nc, nb, ne)
-
 	// Base node equations
 	if nb != 0 {
 		// Y11: Base-Base
 		real := b.gpi - b.gmu
 		imag := omega * (cbe + cbc)
-		phase := math.Atan2(imag, real) * 180 / math.Pi
-		fmt.Printf("Y11 (Base-Base): %g + j%g, Phase: %g deg\n", real, imag, phase)
+		// phase := math.Atan2(imag, real) * 180 / math.Pi
+		// fmt.Printf("Y11 (Base-Base): %g + j%g, Phase: %g deg\n", real, imag, phase)
 		matrix.AddComplexElement(nb, nb, real, imag)
 
 		if nc != 0 {
 			// Y12: Base-Collector
 			real := -b.gmu
 			imag := -omega * cbc
-			phase := math.Atan2(imag, real) * 180 / math.Pi
-			fmt.Printf("Y12 (Base-Collector): %g + j%g, Phase: %g deg\n", real, imag, phase)
+			// phase := math.Atan2(imag, real) * 180 / math.Pi
+			// fmt.Printf("Y12 (Base-Collector): %g + j%g, Phase: %g deg\n", real, imag, phase)
 			matrix.AddComplexElement(nb, nc, real, imag)
 		}
 	}
@@ -466,16 +460,16 @@ func (b *Bjt) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 			// Y21: Collector-Base
 			real := -b.gmu - b.gm
 			imag := -omega * cbc
-			phase := math.Atan2(imag, real) * 180 / math.Pi
-			fmt.Printf("Y21 (Collector-Base): %g + j%g, Phase: %g deg\n", real, imag, phase)
+			// phase := math.Atan2(imag, real) * 180 / math.Pi
+			// fmt.Printf("Y21 (Collector-Base): %g + j%g, Phase: %g deg\n", real, imag, phase)
 			matrix.AddComplexElement(nc, nb, real, imag)
 		}
 
 		// Y22: Collector-Collector
 		real := b.gout + b.gmu
 		imag := omega * cbc
-		phase := math.Atan2(imag, real) * 180 / math.Pi
-		fmt.Printf("Y22 (Collector-Collector): %g + j%g, Phase: %g deg\n", real, imag, phase)
+		// phase := math.Atan2(imag, real) * 180 / math.Pi
+		// fmt.Printf("Y22 (Collector-Collector): %g + j%g, Phase: %g deg\n", real, imag, phase)
 		matrix.AddComplexElement(nc, nc, real, imag)
 	}
 
@@ -485,24 +479,24 @@ func (b *Bjt) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 			// Y31: Emitter-Base
 			real := -b.gpi - b.gm
 			imag := -omega * cbe
-			phase := math.Atan2(imag, real) * 180 / math.Pi
-			fmt.Printf("Y31 (Emitter-Base): %g + j%g, Phase: %g deg\n", real, imag, phase)
+			// phase := math.Atan2(imag, real) * 180 / math.Pi
+			// fmt.Printf("Y31 (Emitter-Base): %g + j%g, Phase: %g deg\n", real, imag, phase)
 			matrix.AddComplexElement(ne, nb, real, imag)
 		}
 		if nc != 0 {
 			// Y32: Emitter-Collector
 			real := -b.gout
 			imag := 0.0
-			phase := math.Atan2(imag, real) * 180 / math.Pi
-			fmt.Printf("Y32 (Emitter-Collector): %g + j%g, Phase: %g deg\n", real, imag, phase)
+			// phase := math.Atan2(imag, real) * 180 / math.Pi
+			// fmt.Printf("Y32 (Emitter-Collector): %g + j%g, Phase: %g deg\n", real, imag, phase)
 			matrix.AddComplexElement(ne, nc, real, imag)
 		}
 
 		// Y33: Emitter-Emitter
 		real := b.gout + b.gpi + b.gm
 		imag := omega * cbe
-		phase := math.Atan2(imag, real) * 180 / math.Pi
-		fmt.Printf("Y33 (Emitter-Emitter): %g + j%g, Phase: %g deg\n", real, imag, phase)
+		// phase := math.Atan2(imag, real) * 180 / math.Pi
+		// fmt.Printf("Y33 (Emitter-Emitter): %g + j%g, Phase: %g deg\n", real, imag, phase)
 		matrix.AddComplexElement(ne, ne, real, imag)
 	}
 
