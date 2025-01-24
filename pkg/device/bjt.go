@@ -428,44 +428,82 @@ func (b *Bjt) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 }
 
 func (b *Bjt) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
-	nc := b.Nodes[0] // Collector
-	nb := b.Nodes[1] // Base
-	ne := b.Nodes[2] // Emitter
+	nc := b.Nodes[0]
+	nb := b.Nodes[1]
+	ne := b.Nodes[2]
 
 	cbe, cbc := b.calculateCapacitances(b.vbe, b.vbc)
 	omega := 2 * math.Pi * status.Frequency
 
-	// Base 노드 처리
+	fmt.Printf("\nBJT AC Analysis at f=%g Hz (omega=%g rad/s):\n", status.Frequency, omega)
+	fmt.Printf("DC Operating Point Values:\n")
+	fmt.Printf("gm=%g, gpi=%g, gmu=%g, gout=%g\n", b.gm, b.gpi, b.gmu, b.gout)
+	fmt.Printf("Capacitances: cbe=%g, cbc=%g\n", cbe, cbc)
+	fmt.Printf("Nodes: nc=%d, nb=%d, ne=%d\n", nc, nb, ne)
+
+	// Base node equations
 	if nb != 0 {
 		// Y11: Base-Base
-		matrix.AddComplexElement(nb, nb, b.gpi+b.gmu, omega*(cbe+cbc))
+		real := b.gpi - b.gmu
+		imag := omega * (cbe + cbc)
+		phase := math.Atan2(imag, real) * 180 / math.Pi
+		fmt.Printf("Y11 (Base-Base): %g + j%g, Phase: %g deg\n", real, imag, phase)
+		matrix.AddComplexElement(nb, nb, real, imag)
+
 		if nc != 0 {
-			// Y12: Base-Collector (피드백)
-			matrix.AddComplexElement(nb, nc, -b.gmu, -omega*cbc)
+			// Y12: Base-Collector
+			real := -b.gmu
+			imag := -omega * cbc
+			phase := math.Atan2(imag, real) * 180 / math.Pi
+			fmt.Printf("Y12 (Base-Collector): %g + j%g, Phase: %g deg\n", real, imag, phase)
+			matrix.AddComplexElement(nb, nc, real, imag)
 		}
 	}
 
-	// Collector 노드 처리
+	// Collector node equations
 	if nc != 0 {
-		// Y21: Collector-Base (트랜스컨덕턴스)
 		if nb != 0 {
-			matrix.AddComplexElement(nc, nb, -b.gmu+b.gm, -omega*cbc)
+			// Y21: Collector-Base
+			real := -b.gmu - b.gm
+			imag := -omega * cbc
+			phase := math.Atan2(imag, real) * 180 / math.Pi
+			fmt.Printf("Y21 (Collector-Base): %g + j%g, Phase: %g deg\n", real, imag, phase)
+			matrix.AddComplexElement(nc, nb, real, imag)
 		}
+
 		// Y22: Collector-Collector
-		matrix.AddComplexElement(nc, nc, b.gout+b.gmu, omega*cbc)
+		real := b.gout + b.gmu
+		imag := omega * cbc
+		phase := math.Atan2(imag, real) * 180 / math.Pi
+		fmt.Printf("Y22 (Collector-Collector): %g + j%g, Phase: %g deg\n", real, imag, phase)
+		matrix.AddComplexElement(nc, nc, real, imag)
 	}
 
-	// 에미터가 접지인 경우 베이스와 컬렉터에 추가 컨덕턴스 반영
-	if ne == 0 {
+	// Emitter node equations
+	if ne != 0 {
 		if nb != 0 {
-			matrix.AddComplexElement(nb, nb, b.gpi+b.gm, omega*cbe)
+			// Y31: Emitter-Base
+			real := -b.gpi - b.gm
+			imag := -omega * cbe
+			phase := math.Atan2(imag, real) * 180 / math.Pi
+			fmt.Printf("Y31 (Emitter-Base): %g + j%g, Phase: %g deg\n", real, imag, phase)
+			matrix.AddComplexElement(ne, nb, real, imag)
 		}
 		if nc != 0 {
-			matrix.AddComplexElement(nc, nc, b.gout+b.gm, 0)
+			// Y32: Emitter-Collector
+			real := -b.gout
+			imag := 0.0
+			phase := math.Atan2(imag, real) * 180 / math.Pi
+			fmt.Printf("Y32 (Emitter-Collector): %g + j%g, Phase: %g deg\n", real, imag, phase)
+			matrix.AddComplexElement(ne, nc, real, imag)
 		}
-		if nb != 0 && nc != 0 {
-			matrix.AddComplexElement(nc, nb, b.gm, 0)
-		}
+
+		// Y33: Emitter-Emitter
+		real := b.gout + b.gpi + b.gm
+		imag := omega * cbe
+		phase := math.Atan2(imag, real) * 180 / math.Pi
+		fmt.Printf("Y33 (Emitter-Emitter): %g + j%g, Phase: %g deg\n", real, imag, phase)
+		matrix.AddComplexElement(ne, ne, real, imag)
 	}
 
 	return nil
