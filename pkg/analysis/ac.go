@@ -66,6 +66,10 @@ func (ac *ACAnalysis) Execute() error {
 			return fmt.Errorf("stamping error at f=%g: %v", freq, err)
 		}
 
+		// 매트릭스 상태 출력
+		fmt.Printf("\nMatrix at frequency %g Hz:\n", freq)
+		mat.PrintSystem()
+
 		err = mat.Solve()
 		if err != nil {
 			return fmt.Errorf("matrix solve error at f=%g: %v", freq, err)

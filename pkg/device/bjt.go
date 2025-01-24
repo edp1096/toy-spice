@@ -428,42 +428,43 @@ func (b *Bjt) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 }
 
 func (b *Bjt) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
-	nc := b.Nodes[0]
-	nb := b.Nodes[1]
-	ne := b.Nodes[2]
+	nc := b.Nodes[0] // Collector
+	nb := b.Nodes[1] // Base
+	ne := b.Nodes[2] // Emitter
 
-	// Use stored conductances from DC operating point
 	cbe, cbc := b.calculateCapacitances(b.vbe, b.vbc)
 	omega := 2 * math.Pi * status.Frequency
 
-	// Y-parameters with stored conductances
+	// Base 노드 처리
 	if nb != 0 {
+		// Y11: Base-Base
 		matrix.AddComplexElement(nb, nb, b.gpi+b.gmu, omega*(cbe+cbc))
 		if nc != 0 {
+			// Y12: Base-Collector (피드백)
 			matrix.AddComplexElement(nb, nc, -b.gmu, -omega*cbc)
-		}
-		if ne != 0 {
-			matrix.AddComplexElement(nb, ne, -b.gpi, -omega*cbe)
 		}
 	}
 
+	// Collector 노드 처리
 	if nc != 0 {
-		matrix.AddComplexElement(nc, nc, b.gout+b.gmu, omega*cbc)
+		// Y21: Collector-Base (트랜스컨덕턴스)
 		if nb != 0 {
 			matrix.AddComplexElement(nc, nb, -b.gmu+b.gm, -omega*cbc)
 		}
-		if ne != 0 {
-			matrix.AddComplexElement(nc, ne, -b.gout-b.gm, 0)
-		}
+		// Y22: Collector-Collector
+		matrix.AddComplexElement(nc, nc, b.gout+b.gmu, omega*cbc)
 	}
 
-	if ne != 0 {
-		matrix.AddComplexElement(ne, ne, b.gout+b.gpi+b.gm, omega*cbe)
-		if nc != 0 {
-			matrix.AddComplexElement(ne, nc, -b.gout, 0)
-		}
+	// 에미터가 접지인 경우 베이스와 컬렉터에 추가 컨덕턴스 반영
+	if ne == 0 {
 		if nb != 0 {
-			matrix.AddComplexElement(ne, nb, -b.gpi-b.gm, -omega*cbe)
+			matrix.AddComplexElement(nb, nb, b.gpi+b.gm, omega*cbe)
+		}
+		if nc != 0 {
+			matrix.AddComplexElement(nc, nc, b.gout+b.gm, 0)
+		}
+		if nb != 0 && nc != 0 {
+			matrix.AddComplexElement(nc, nb, b.gm, 0)
 		}
 	}
 
