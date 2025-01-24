@@ -317,9 +317,6 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		modelType = strings.ToUpper(typeField)
 	}
 
-	// if modelType != "D" && modelType != "CORE" {
-	// 	return fmt.Errorf("unsupported model type: %s", modelType)
-	// }
 	var supportedModelTypes = []string{"D", "CORE", "NPN", "PNP"}
 
 	if !util.SliceContains(supportedModelTypes, modelType) {
@@ -682,8 +679,6 @@ func parseCurrentSource(fields []string) (*Element, error) {
 
 // ParseValue - Parse value and factor. 1k -> 1000
 func ParseValue(val string) (float64, error) {
-	// re := regexp.MustCompile(`^([-+]?\d*\.?\d+)([TGMKkmunpf])?s?$`)
-	// re := regexp.MustCompile(`^([-+]?\d*\.?\d+)(meg|[TGMKkmunpf])?s?$`)
 	re := regexp.MustCompile(`^([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?)(meg|[TGMKkmunpf])?s?$`)
 	matches := re.FindStringSubmatch(strings.TrimSpace(val))
 
