@@ -106,7 +106,9 @@ func (c *Capacitor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) err
 	return nil
 }
 
-func (c *Capacitor) SetTimeStep(dt float64) {}
+func (c *Capacitor) SetTimeStep(dt float64, status *CircuitStatus) {
+	status.TimeStep = dt
+}
 
 func (c *Capacitor) UpdateState(voltages []float64, status *CircuitStatus) {
 	v1 := 0.0

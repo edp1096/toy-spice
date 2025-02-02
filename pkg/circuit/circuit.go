@@ -13,7 +13,7 @@ type Circuit struct {
 	branchMap        map[string]int
 	devices          []device.Device
 	numNodes         int
-	matrix           *matrix.CircuitMatrix
+	Matrix           *matrix.CircuitMatrix
 	Status           *device.CircuitStatus
 	Time             float64
 	timeStep         float64
@@ -71,7 +71,7 @@ func (c *Circuit) AssignNodeBranchMaps(elements []netlist.Element) error {
 
 func (c *Circuit) CreateMatrix() {
 	matrixSize := len(c.nodeMap) + len(c.branchMap)
-	c.matrix = matrix.NewMatrix(matrixSize, c.isComplex)
+	c.Matrix = matrix.NewMatrix(matrixSize, c.isComplex)
 }
 
 func (c *Circuit) SetupDevices(elements []netlist.Element) error {
@@ -150,7 +150,7 @@ func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 	if err != nil {
 		return fmt.Errorf("initial stamping failed: %v", err)
 	}
-	c.matrix.SetupElements()
+	c.Matrix.SetupElements()
 
 	return nil
 }
@@ -159,7 +159,7 @@ func (c *Circuit) Stamp(status *device.CircuitStatus) error {
 	var err error
 
 	for _, dev := range c.devices {
-		err = dev.Stamp(c.matrix, status)
+		err = dev.Stamp(c.Matrix, status)
 		if err != nil {
 			return fmt.Errorf("stamping device %s: %v", dev.GetName(), err)
 		}
@@ -171,13 +171,13 @@ func (c *Circuit) SetTimeStep(dt float64) {
 	c.timeStep = dt
 	for _, dev := range c.devices {
 		if td, ok := dev.(device.TimeDependent); ok {
-			td.SetTimeStep(dt)
+			td.SetTimeStep(dt, c.Status)
 		}
 	}
 }
 
 func (c *Circuit) Update() {
-	solution := c.matrix.Solution()
+	solution := c.Matrix.Solution()
 
 	c.Status = &device.CircuitStatus{
 		Time:     c.Time,
@@ -189,14 +189,14 @@ func (c *Circuit) Update() {
 
 	for _, dev := range c.devices {
 		if td, ok := dev.(device.TimeDependent); ok {
-			td.SetTimeStep(c.timeStep)
+			td.SetTimeStep(c.timeStep, c.Status)
 			td.UpdateState(solution, c.Status)
 		}
 	}
 }
 
 func (c *Circuit) GetMatrix() *matrix.CircuitMatrix {
-	return c.matrix
+	return c.Matrix
 }
 
 func (c *Circuit) GetNodeMap() map[string]int {
@@ -213,7 +213,7 @@ func (c *Circuit) GetDevices() []device.Device {
 
 func (c *Circuit) GetSolution() map[string]float64 {
 	solution := make(map[string]float64)
-	matrixSolution := c.matrix.Solution()
+	matrixSolution := c.Matrix.Solution()
 
 	// Node voltage
 	for name, idx := range c.nodeMap {
@@ -245,8 +245,8 @@ func (c *Circuit) GetSolution() map[string]float64 {
 }
 
 func (c *Circuit) Destroy() {
-	if c.matrix != nil {
-		c.matrix.Destroy()
+	if c.Matrix != nil {
+		c.Matrix.Destroy()
 	}
 }
 
@@ -263,7 +263,7 @@ func (c *Circuit) GetNodeVoltage(nodeIdx int) float64 {
 		return 0
 	}
 
-	solution := c.matrix.Solution()
+	solution := c.Matrix.Solution()
 	if nodeIdx >= len(solution) {
 		return 0
 	}

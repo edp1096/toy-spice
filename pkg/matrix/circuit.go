@@ -99,6 +99,14 @@ func (m *CircuitMatrix) AddComplexRHS(i int, real, imag float64) {
 	}
 }
 
+func (m *CircuitMatrix) AddRHS(i int, value float64) {
+	if i <= 0 || i > m.Size {
+		fmt.Printf("Warning: RHS index out of bounds (i=%d, size=%d)\n", i, m.Size)
+		return
+	}
+	m.rhs[i] += value
+}
+
 func (m *CircuitMatrix) LoadGmin(gmin float64) {
 	size := m.Size
 	for i := 1; i <= size; i++ {
@@ -106,14 +114,6 @@ func (m *CircuitMatrix) LoadGmin(gmin float64) {
 			diag.Real += gmin
 		}
 	}
-}
-
-func (m *CircuitMatrix) AddRHS(i int, value float64) {
-	if i <= 0 || i > m.Size {
-		fmt.Printf("Warning: RHS index out of bounds (i=%d, size=%d)\n", i, m.Size)
-		return
-	}
-	m.rhs[i] += value
 }
 
 func (m *CircuitMatrix) Clear() {
