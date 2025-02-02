@@ -55,8 +55,7 @@ func (l *Inductor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 		}
 
 	case OperatingPointAnalysis:
-		// OP
-		gmin := 1e+12
+		gmin := 1e-12
 		if n1 != 0 {
 			matrix.AddElement(n1, n1, gmin)
 		}
@@ -65,7 +64,6 @@ func (l *Inductor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 		}
 
 	case TransientAnalysis:
-		// Transient
 		dt := status.TimeStep
 		geq := dt / (2.0 * l.Value)
 		ieq := l.Current1 + geq*(l.Voltage1-l.Voltage0)
@@ -110,6 +108,14 @@ func (l *Inductor) GetCurrent() float64 {
 	return l.Current0
 }
 
+func (l *Inductor) GetPreviousCurrent() float64 {
+	return l.Current1
+}
+
 func (l *Inductor) GetVoltage() float64 {
 	return l.Voltage0
+}
+
+func (l *Inductor) GetPreviousVoltage() float64 {
+	return l.Voltage1
 }

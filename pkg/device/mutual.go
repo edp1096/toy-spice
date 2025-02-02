@@ -70,26 +70,33 @@ func (m *Mutual) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error 
 			nodes[i] = [2]int{m.inductors[i].GetNodes()[0], m.inductors[i].GetNodes()[1]}
 		}
 
-		// SPICE3F5 스타일의 스탬핑
 		for i := 0; i < n; i++ {
 			for j := i + 1; j < n; j++ {
-				// SPICE3F5 방식의 상호 인덕턴스 계산
+				// 상호 인덕턴스 계산
 				Mij := m.coefficient * math.Sqrt(L[i]*L[j])
 
 				if Mij != 0.0 {
 					gij := dt / (2.0 * Mij)
 
-					// i번째 인덕터의 전류와 전압
+					// ith iductor current/voltage
 					vi := m.inductors[i].GetVoltage()
+					// viPrev := m.inductors[i].GetPreviousVoltage()
 					ii := m.inductors[i].GetCurrent()
+					// iiPrev := m.inductors[i].GetPreviousCurrent()
 
-					// j번째 인덕터의 전류와 전압
+					// jth inductor current/voltage
 					vj := m.inductors[j].GetVoltage()
+					// vjPrev := m.inductors[j].GetPreviousVoltage()
 					ij := m.inductors[j].GetCurrent()
+					// ijPrev := m.inductors[j].GetPreviousCurrent()
 
-					// SPICE3F5 방식의 등가 전류원
+					// Equivalent current source
 					ieqi := ii + gij*vj // i->j coupling
 					ieqj := ij + gij*vi // j->i coupling
+					// ieqi := ii + gij*(vj+vjPrev)/2.0
+					// ieqj := ij + gij*(vi+viPrev)/2.0
+					// ieqi := ii + gij*(ij-ijPrev)
+					// ieqj := ij + gij*(ii-iiPrev)
 
 					// 매트릭스 스탬핑
 					if nodes[i][0] > 0 {

@@ -6,7 +6,8 @@ Lp 2 0 200m
 
 Ls 3 0 50m
 Rs_leak 3 4 0.05
-Rload 4 0 100
+
+Rload 4 0 10k
 
 K1 Lp Ls 0.95
 

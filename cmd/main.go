@@ -193,7 +193,7 @@ func printResults(results map[string][]float64) {
 	}
 }
 
-func procWithPrint() {
+func procWithPrintSystem() {
 	var err error
 
 	// 1. Open and read netlist
@@ -370,7 +370,7 @@ func procWithPrint() {
 	printResults(analyzer.GetResults())
 }
 
-func procWithoutPrint() {
+func procPrint() {
 	var err error
 
 	// 1. Open and read netlist
@@ -463,6 +463,6 @@ func main() {
 		log.Fatal("Usage: spice <netlist_file>")
 	}
 
-	// procWithPrint()
-	procWithoutPrint()
+	// procPrint()
+	procWithPrintSystem()
 }

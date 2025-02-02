@@ -47,7 +47,9 @@ type InductorComponent interface {
 	Device
 	GetValue() float64
 	GetCurrent() float64
+	GetPreviousCurrent() float64
 	GetVoltage() float64
+	GetPreviousVoltage() float64
 	GetNodes() []int
 }
 
