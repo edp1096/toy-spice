@@ -30,7 +30,7 @@ func NewInductor(name string, nodeNames []string, value float64) *Inductor {
 
 func (l *Inductor) GetType() string { return "L" }
 
-func (l *Inductor) SetTimeStep(dt float64) {}
+func (l *Inductor) SetTimeStep(dt float64, status *CircuitStatus) { status.TimeStep = dt }
 
 func (l *Inductor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 	n1, n2 := l.Nodes[0], l.Nodes[1]
@@ -65,8 +65,9 @@ func (l *Inductor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 
 	case TransientAnalysis:
 		dt := status.TimeStep
+
 		geq := dt / (2.0 * l.Value)
-		ieq := l.Current1 + geq*(l.Voltage1-l.Voltage0)
+		ieq := l.Current1 + geq*(l.Voltage0-l.Voltage1)
 
 		if n1 != 0 {
 			matrix.AddElement(n1, n1, geq)
@@ -92,11 +93,13 @@ func (l *Inductor) UpdateState(voltages []float64, status *CircuitStatus) {
 	}
 	vd := v1 - v2
 
-	l.flux0 = l.flux1 + l.Voltage1*status.TimeStep
-	l.Current0 = l.flux0 / l.Value
+	// dt := status.TimeStep
+	// l.Current0 = l.Current1 + vd*dt/l.Value
+	// l.flux0 = l.flux1 + vd*dt
 
 	l.Voltage1 = l.Voltage0
 	l.Voltage0 = vd
+	l.Current1 = l.Current0
 	l.flux1 = l.flux0
 }
 

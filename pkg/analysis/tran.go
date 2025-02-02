@@ -26,11 +26,16 @@ type Transient struct {
 }
 
 func NewTransient(tStart, tStop, tStep, tMax float64, uic bool) *Transient {
+	if tStep > tStop/300 {
+		tStep = tStop / 300
+	}
+
 	minStep := tStep / 50.0
 	if tMax == 0 {
 		tMax = tStep
 	}
-	return &Transient{
+
+	analysisSettings := &Transient{
 		BaseAnalysis: *NewBaseAnalysis(),
 		op:           NewOP(),
 		startTime:    tStart,
@@ -44,6 +49,8 @@ func NewTransient(tStart, tStop, tStep, tMax float64, uic bool) *Transient {
 		trtol:        7.0, // SPICE3F5 default
 		firstTime:    true,
 	}
+
+	return analysisSettings
 }
 
 func (tr *Transient) Setup(ckt *circuit.Circuit) error {
@@ -98,19 +105,32 @@ func (tr *Transient) Execute() error {
 			return fmt.Errorf("failed to converge at t=%g", tr.time)
 		}
 
+		lte := tr.calculateTruncError()
+		if lte > tr.trtol {
+			if tr.timeStep > tr.minStep {
+				tr.timeStep /= 2
+				continue
+			}
+		}
+
+		if tr.firstTime && lte < tr.trtol/10 {
+			tr.order = 2 // TR
+			tr.firstTime = false
+		}
+
 		tr.Circuit.Update()
 		tr.time = nextTime
 		if tr.time >= tr.startTime {
 			tr.StoreTimeResult(tr.time, tr.Circuit.GetSolution())
 		}
 
-		if tr.time < tr.stopTime {
-			if tr.timeStep < tr.maxStep {
-				tr.timeStep *= 1.1
-				if tr.timeStep > tr.maxStep {
-					tr.timeStep = tr.maxStep
-				}
-			}
+		if tr.time < tr.stopTime && tr.timeStep < tr.maxStep {
+			// tr.timeStep *= 1.1
+			// if tr.timeStep > tr.maxStep {
+			// 	tr.timeStep = tr.maxStep
+			// }
+			// tr.timeStep = math.Min(tr.timeStep*2, tr.maxStep)
+			tr.timeStep = math.Min(tr.timeStep*1.1, tr.maxStep)
 		}
 	}
 

@@ -1,5 +1,5 @@
 * RLC Test
-.tran 0.1m 3ms
+.tran 0.01m 2ms
 Vin 1 0 SIN(0 5 1k)
 R1 1 2 100
 L1 2 3 1m

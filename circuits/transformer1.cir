@@ -11,4 +11,4 @@ Rload 4 0 10k
 
 K1 Lp Ls 0.95
 
-.tran 10u 3m
+.tran 0.01m 3m

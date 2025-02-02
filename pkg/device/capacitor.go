@@ -37,6 +37,8 @@ func NewCapacitor(name string, nodeNames []string, value float64) *Capacitor {
 
 func (c *Capacitor) GetType() string { return "C" }
 
+func (c *Capacitor) SetTimeStep(dt float64, status *CircuitStatus) { status.TimeStep = dt }
+
 func (c *Capacitor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 	n1, n2 := c.Nodes[0], c.Nodes[1]
 	adjustedC := c.temperatureAdjustedValue(status.Temp)
@@ -62,7 +64,6 @@ func (c *Capacitor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) err
 		}
 
 	case OperatingPointAnalysis:
-		// OP
 		gmin := status.Gmin
 		if gmin < 1e-12 {
 			gmin = 1e-12
@@ -81,11 +82,11 @@ func (c *Capacitor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) err
 		}
 
 	case TransientAnalysis:
-		// Transient
 		dt := status.TimeStep
-		// geq := c.Value / dt
+		// geq := 2.0 * adjustedC / dt
+		// ceq := geq*c.Voltage0/2.0 + c.current1
 		geq := adjustedC / dt
-		ceq := geq * c.Voltage0
+		ceq := c.charge1 / dt
 
 		if n1 != 0 {
 			matrix.AddElement(n1, n1, geq)
@@ -106,8 +107,33 @@ func (c *Capacitor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) err
 	return nil
 }
 
-func (c *Capacitor) SetTimeStep(dt float64, status *CircuitStatus) {
-	status.TimeStep = dt
+func (c *Capacitor) UpdateStateNotUse(voltages []float64, status *CircuitStatus) {
+	v1 := 0.0
+	if c.Nodes[0] != 0 {
+		v1 = voltages[c.Nodes[0]]
+	}
+	v2 := 0.0
+	if c.Nodes[1] != 0 {
+		v2 = voltages[c.Nodes[1]]
+	}
+	vd := v1 - v2
+	dt := status.TimeStep
+
+	if status.IntegMode == PredictMode {
+		// Predict Mode - copy previous state
+		c.charge0 = c.charge1
+		c.current0 = c.current1
+		c.Voltage0 = c.Voltage1
+	} else {
+		// Normal Mode - update state to previous voltage
+		c.charge0 = c.charge1 + (c.current0+c.current1)*dt/2.0
+		c.current0 = c.Value * (vd - c.Voltage1) / dt
+		c.Voltage0 = vd
+	}
+
+	c.charge1 = c.charge0
+	c.Voltage1 = c.Voltage0
+	c.current1 = c.current0
 }
 
 func (c *Capacitor) UpdateState(voltages []float64, status *CircuitStatus) {
@@ -121,17 +147,11 @@ func (c *Capacitor) UpdateState(voltages []float64, status *CircuitStatus) {
 	}
 	vd := v1 - v2
 
-	if status.IntegMode == PredictMode {
-		// Predict Mode - copy previous state
-		c.charge0 = c.charge1
-		c.current0 = c.current1
-		c.Voltage0 = c.Voltage1
-	} else {
-		// Normal Mode - update state to previous voltage
-		c.charge0 = c.charge1 + c.current1*status.TimeStep
-		c.Voltage0 = vd
-		c.current0 = c.Value * (vd - c.Voltage1) / status.TimeStep
-	}
+	c.charge1 = c.charge0
+	c.charge0 = c.Value * vd
+
+	c.Voltage1 = c.Voltage0
+	c.Voltage0 = vd
 }
 
 func (c *Capacitor) CalculateLTE(voltages map[string]float64, status *CircuitStatus) float64 {
