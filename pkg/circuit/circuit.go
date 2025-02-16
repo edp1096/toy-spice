@@ -59,7 +59,7 @@ func (c *Circuit) AssignNodeBranchMaps(elements []netlist.Element) error {
 
 	branchStart := len(c.nodeMap) + 1
 	for _, elem := range elements {
-		if elem.Type == "V" {
+		if elem.Type == "V" || elem.Type == "L" {
 			c.branchMap[elem.Name] = branchStart
 			branchStart++
 		}
@@ -103,6 +103,11 @@ func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 		// 전압원 브랜치 인덱스 설정
 		if v, ok := dev.(*device.VoltageSource); ok {
 			v.SetBranchIndex(c.branchMap[elem.Name])
+		}
+
+		// 인덕터 브랜치 인덱스 설정
+		if l, ok := dev.(*device.Inductor); ok {
+			l.SetBranchIndex(c.branchMap[elem.Name])
 		}
 
 		// 비선형 디바이스 처리
@@ -169,6 +174,11 @@ func (c *Circuit) Stamp(status *device.CircuitStatus) error {
 
 func (c *Circuit) SetTimeStep(dt float64) {
 	c.timeStep = dt
+	if c.Status != nil {
+		c.Status.TimeStep = dt
+	}
+
+	// 모든 시간 의존 소자에 시간 스텝 설정
 	for _, dev := range c.devices {
 		if td, ok := dev.(device.TimeDependent); ok {
 			td.SetTimeStep(dt, c.Status)
@@ -176,22 +186,37 @@ func (c *Circuit) SetTimeStep(dt float64) {
 	}
 }
 
+func (c *Circuit) LoadState() {
+	voltages := c.Matrix.Solution()
+
+	// 모든 시간 의존 소자의 상태 로드
+	for _, dev := range c.devices {
+		if td, ok := dev.(device.TimeDependent); ok {
+			td.LoadState(voltages, c.Status)
+		}
+	}
+}
+
 func (c *Circuit) Update() {
 	solution := c.Matrix.Solution()
 
-	c.Status = &device.CircuitStatus{
-		Time:     c.Time,
-		TimeStep: c.timeStep,
-		Gmin:     1e-12,
-		Mode:     device.TransientAnalysis,
-		Temp:     300.15, // 27 = 300.15K
-	}
-
+	// 모든 시간 의존 소자의 상태 업데이트
 	for _, dev := range c.devices {
 		if td, ok := dev.(device.TimeDependent); ok {
-			td.SetTimeStep(c.timeStep, c.Status)
 			td.UpdateState(solution, c.Status)
 		}
+	}
+
+	// 현재 해를 이전 해로 저장
+	for nodeName, nodeIdx := range c.nodeMap {
+		key := fmt.Sprintf("V(%s)", nodeName)
+		c.prevSolution[key] = solution[nodeIdx]
+	}
+
+	// 브랜치 전류도 저장
+	for devName, branchIdx := range c.branchMap {
+		key := fmt.Sprintf("I(%s)", devName)
+		c.prevSolution[key] = -solution[branchIdx]
 	}
 }
 

@@ -34,6 +34,7 @@ type ACElement interface {
 type TimeDependent interface {
 	SetTimeStep(dt float64, status *CircuitStatus)
 	UpdateState(voltages []float64, status *CircuitStatus)
+	LoadState(voltages []float64, status *CircuitStatus)
 	CalculateLTE(voltages map[string]float64, status *CircuitStatus) float64
 }
 

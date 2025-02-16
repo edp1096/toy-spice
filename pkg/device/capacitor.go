@@ -107,6 +107,21 @@ func (c *Capacitor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) err
 	return nil
 }
 
+func (c *Capacitor) LoadState(voltages []float64, status *CircuitStatus) {
+	v1 := 0.0
+	if c.Nodes[0] != 0 {
+		v1 = voltages[c.Nodes[0]]
+	}
+	v2 := 0.0
+	if c.Nodes[1] != 0 {
+		v2 = voltages[c.Nodes[1]]
+	}
+	vd := v1 - v2
+
+	// 전류는 i = C * dv/dt
+	c.current0 = c.Value * (vd - c.Voltage0) / status.TimeStep
+}
+
 func (c *Capacitor) UpdateStateNotUse(voltages []float64, status *CircuitStatus) {
 	v1 := 0.0
 	if c.Nodes[0] != 0 {

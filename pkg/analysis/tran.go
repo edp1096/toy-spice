@@ -78,6 +78,22 @@ func (tr *Transient) Execute() error {
 		return fmt.Errorf("circuit not set")
 	}
 
+	// 초기 상태 계산
+	if !tr.useUIC {
+		err := tr.op.Setup(tr.Circuit)
+		if err != nil {
+			return fmt.Errorf("operating point setup error: %v", err)
+		}
+		err = tr.op.Execute()
+		if err != nil {
+			return fmt.Errorf("operating point analysis error: %v", err)
+		}
+	}
+
+	// 초기 시간 스텝과 방법 설정
+	tr.timeStep = tr.minStep
+	methodState := device.BE // 시작은 BE로
+
 	for tr.time < tr.stopTime {
 		nextTime := tr.time + tr.timeStep
 		if nextTime > tr.stopTime {
@@ -89,13 +105,13 @@ func (tr *Transient) Execute() error {
 			Time:     tr.time,
 			TimeStep: tr.timeStep,
 			Mode:     device.TransientAnalysis,
-			Method:   tr.order,
-			Temp:     300.15, // 27 = 300.15K
+			Method:   methodState,
+			Temp:     300.15,
 			Gmin:     tr.convergence.gmin,
 		}
 		tr.Circuit.Status = status
-		tr.Circuit.SetTimeStep(tr.timeStep)
 
+		// NR 반복
 		err := tr.doNRiter(0, tr.convergence.maxIter)
 		if err != nil {
 			if tr.timeStep > tr.minStep {
@@ -105,6 +121,7 @@ func (tr *Transient) Execute() error {
 			return fmt.Errorf("failed to converge at t=%g", tr.time)
 		}
 
+		// LTE 검사
 		lte := tr.calculateTruncError()
 		if lte > tr.trtol {
 			if tr.timeStep > tr.minStep {
@@ -113,24 +130,30 @@ func (tr *Transient) Execute() error {
 			}
 		}
 
-		if tr.firstTime && lte < tr.trtol/10 {
-			tr.order = 2 // TR
-			tr.firstTime = false
+		// 방법 전환 검사 (BE -> TR)
+		if methodState == device.BE && tr.time > 0 {
+			if lte < tr.trtol/10 {
+				methodState = device.TR
+			}
 		}
 
+		// 상태 업데이트
+		tr.Circuit.LoadState()
 		tr.Circuit.Update()
 		tr.time = nextTime
+
+		// 결과 저장
 		if tr.time >= tr.startTime {
 			tr.StoreTimeResult(tr.time, tr.Circuit.GetSolution())
 		}
 
+		// 시간 스텝 조정
 		if tr.time < tr.stopTime && tr.timeStep < tr.maxStep {
-			// tr.timeStep *= 1.1
-			// if tr.timeStep > tr.maxStep {
-			// 	tr.timeStep = tr.maxStep
-			// }
-			// tr.timeStep = math.Min(tr.timeStep*2, tr.maxStep)
-			tr.timeStep = math.Min(tr.timeStep*1.1, tr.maxStep)
+			if lte < tr.trtol/100 {
+				tr.timeStep = math.Min(tr.timeStep*2, tr.maxStep)
+			} else {
+				tr.timeStep = math.Min(tr.timeStep*1.1, tr.maxStep)
+			}
 		}
 	}
 
