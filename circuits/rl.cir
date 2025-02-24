@@ -1,7 +1,5 @@
 * RL Test
-.tran 0.1m 3ms
+.tran 10u 2ms
 Vin 1 0 SIN (0 5 1k)
-*.op
-*Vin 1 0 DC 5
 R1 1 2 100
 L1 2 0 1m

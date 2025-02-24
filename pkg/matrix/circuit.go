@@ -18,15 +18,12 @@ type CircuitMatrix struct {
 }
 
 func NewMatrix(size int, isComplex bool) *CircuitMatrix {
-	separatedComplexVectors := false
-	translate := false
-
 	config := &sparse.Configuration{
 		Real:                    true,
 		Complex:                 isComplex,
-		SeparatedComplexVectors: separatedComplexVectors,
+		SeparatedComplexVectors: false,
+		Translate:               true,
 		Expandable:              true,
-		Translate:               translate,
 		ModifiedNodal:           true,
 		TiesMultiplier:          5,
 		PrinterWidth:            140,

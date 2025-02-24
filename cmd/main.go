@@ -250,7 +250,7 @@ func procWithPrintSystem() {
 		}
 
 		// For voltage sources
-		if elem.Type == "V" {
+		if elem.Type == "V" || elem.Type == "L" {
 			branchMap := circuit.GetBranchMap()
 			branchIdx := branchMap[elem.Name]
 			fmt.Printf("Branch index: %d\n", branchIdx)
