@@ -5,11 +5,6 @@ import (
 	"toy-spice/pkg/matrix"
 )
 
-type ACVoltageSource struct {
-	acMag   float64
-	acPhase float64
-}
-
 type VoltageSource struct {
 	BaseDevice
 	vtype SourceType
