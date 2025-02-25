@@ -2,12 +2,13 @@ Toy RLC SPICE
 
 ## Build
 ```sh
-go build -o bin/ ./cmd
+make
 ```
 
 ## Run
 ```sh
-./bin/spice circuits/rr.cir
+cd bin
+./spice ../circuits/rr.cir
 ```
 
 ## Source

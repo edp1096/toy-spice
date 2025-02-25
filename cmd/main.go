@@ -14,15 +14,6 @@ import (
 	"toy-spice/pkg/util"
 )
 
-func getKeys(m map[string][]float64) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
-}
-
 func printResults(results map[string][]float64) {
 	fmt.Println("\nAnalysis Results:")
 	fmt.Println("================")
