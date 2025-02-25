@@ -318,7 +318,7 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		modelType = strings.ToUpper(typeField)
 	}
 
-	var supportedModelTypes = []string{"D", "CORE", "NPN", "PNP"}
+	var supportedModelTypes = []string{"D", "CORE", "NPN", "PNP", "NMOS", "PMOS"}
 
 	if !util.SliceContains(supportedModelTypes, modelType) {
 		return fmt.Errorf("unsupported model type: %s", modelType)
@@ -402,9 +402,36 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		params["xtb"] = 0.0   // Forward and reverse beta temp. exp
 		params["eg"] = 1.11   // Energy gap
 		params["xti"] = 3.0   // Temp. exponent for Is
+	case "NMOS", "PMOS":
+		params["level"] = 1     // 기본 레벨 1
+		params["vto"] = 0.7     // 문턱 전압
+		params["kp"] = 2e-5     // 트랜스컨덕턴스 파라미터
+		params["gamma"] = 0.5   // 기판 효과 계수
+		params["phi"] = 0.6     // 표면 포텐셜
+		params["lambda"] = 0.01 // 채널 길이 변조 파라미터
+		params["rd"] = 0.0      // 드레인 저항
+		params["rs"] = 0.0      // 소스 저항
+		params["cbd"] = 0.0     // 벌크-드레인 접합 캐패시턴스
+		params["cbs"] = 0.0     // 벌크-소스 접합 캐패시턴스
+		params["is"] = 1e-14    // 벌크 접합 포화 전류
+		params["pb"] = 0.8      // 벌크 접합 전위
+		params["cgso"] = 0.0    // 게이트-소스 오버랩 캐패시턴스
+		params["cgdo"] = 0.0    // 게이트-드레인 오버랩 캐패시턴스
+		params["cgbo"] = 0.0    // 게이트-벌크 오버랩 캐패시턴스
+		params["cj"] = 0.0      // 벌크 접합 캐패시턴스
+		params["mj"] = 0.5      // 벌크 접합 기울기 계수
+		params["cjsw"] = 0.0    // 벌크 접합 측벽 캐패시턴스
+		params["mjsw"] = 0.33   // 벌크 접합 측벽 기울기 계수
+		params["tox"] = 1e-7    // 산화막 두께
+		params["l"] = 10e-6     // 채널 길이
+		params["w"] = 10e-6     // 채널 폭
+
+		if modelType == "PMOS" {
+			params["type"] = 1.0 // PMOS = 1, NMOS = 0
+		}
 	}
 
-	// 파라미터 파싱
+	// Parse parameters
 	paramPairs := strings.Fields(paramStr)
 	for _, pair := range paramPairs {
 		parts := strings.Split(pair, "=")
@@ -515,6 +542,25 @@ func parseElement(line string) (*Element, error) {
 		if len(fields) > 4 {
 			elem.Params["model"] = fields[4]
 		}
+		return elem, nil
+
+	case "M":
+		if len(fields) < 6 {
+			return nil, fmt.Errorf("insufficient MOSFET parameters: need nodes and model name")
+		}
+
+		elem.Nodes = fields[1:5] // Drain, Gate, Source, Bulk
+		elem.Params = make(map[string]string)
+		elem.Params["model"] = fields[5] // Model name
+
+		// Parameters eg. L=2u W=20u ...
+		for i := 6; i < len(fields); i++ {
+			parts := strings.Split(fields[i], "=")
+			if len(parts) == 2 {
+				elem.Params[strings.ToLower(parts[0])] = parts[1]
+			}
+		}
+
 		return elem, nil
 
 	default:
@@ -776,6 +822,29 @@ func CreateDevice(elem Element, nodeMap map[string]int, models map[string]device
 			}
 		}
 		return bjt, nil
+
+	case "M":
+		if modelName, ok := elem.Params["model"]; ok {
+			mosfet := device.NewMosfet(elem.Name, elem.Nodes)
+			if model, exists := models[modelName]; exists {
+				mosfet.SetModelParameters(model.Params)
+			}
+
+			if l, ok := elem.Params["l"]; ok {
+				if lVal, err := ParseValue(l); err == nil {
+					mosfet.L = lVal
+				}
+			}
+			if w, ok := elem.Params["w"]; ok {
+				if wVal, err := ParseValue(w); err == nil {
+					mosfet.W = wVal
+				}
+			}
+
+			return mosfet, nil
+		}
+
+		return nil, fmt.Errorf("mosfet %s: model not specified", elem.Name)
 
 	case "V":
 		switch elem.Params["type"] {
