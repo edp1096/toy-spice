@@ -709,23 +709,20 @@ func CreateDevice(elem Element, nodeMap map[string]int, models map[string]device
 		return device.NewResistor(elem.Name, elem.Nodes, elem.Value), nil
 
 	case "L":
-		// Transformer
+		// Transformer - Magnetic Core
 		if coreName, ok := elem.Params["core"]; ok {
-			// 마그네틱 코어 인덕터
 			if model, exists := models[coreName]; exists {
 				if model.Type == "CORE" {
-					// 턴수 파싱
-					turns := 100 // 기본값
+					// Parse turns of winding
+					turns := 100 // Default winding
 					if turnsStr, ok := elem.Params["turns"]; ok {
 						if t, err := strconv.Atoi(turnsStr); err == nil {
 							turns = t
 						}
 					}
 
-					// 인덕터 생성
 					inductor := device.NewMagneticInductor(elem.Name, elem.Nodes, turns)
 
-					// 공유 코어 처리
 					if core, exists := magneticCores[coreName]; exists {
 						inductor.SetCore(model.Params)
 						core.AddInductor(inductor)
@@ -748,7 +745,6 @@ func CreateDevice(elem Element, nodeMap map[string]int, models map[string]device
 		return device.NewCapacitor(elem.Name, elem.Nodes, elem.Value), nil
 
 	case "K":
-		// 인덕터 이름들 수집
 		var indNames []string
 		for i := 1; ; i++ {
 			if name, ok := elem.Params[fmt.Sprintf("ind%d", i)]; ok {
@@ -763,7 +759,6 @@ func CreateDevice(elem Element, nodeMap map[string]int, models map[string]device
 		return device.NewMutual(elem.Name, indNames, elem.Value), nil
 
 	case "D":
-		// return device.NewDiode(elem.Name, elem.Nodes), nil
 		diode := device.NewDiode(elem.Name, elem.Nodes)
 		if modelName, ok := elem.Params["model"]; ok {
 			if model, exists := models[modelName]; exists {
@@ -950,7 +945,7 @@ func parsePWLParams(params string) (times []float64, values []float64, err error
 	times = make([]float64, numPoints)
 	values = make([]float64, numPoints)
 
-	for i := 0; i < numPoints; i++ {
+	for i := range numPoints {
 		// Time point
 		times[i], err = ParseValue(pwlParams[2*i])
 		if err != nil {

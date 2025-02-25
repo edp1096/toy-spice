@@ -76,14 +76,14 @@ func (c *Circuit) CreateMatrix() {
 
 func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 	var err error
-	// 디바이스 맵 추가
 	deviceMap := make(map[string]device.Device)
 
-	// 상호 인덕턴스를 제외한 모든 디바이스 생성
+	// Create all devices except mutual inductance device
 	for _, elem := range elements {
 		if elem.Type == "K" {
-			continue // 상호 인덕턴스는 나중에 처리
+			continue
 		}
+
 		dev, err := netlist.CreateDevice(elem, c.nodeMap, c.Models)
 		if err != nil {
 			return fmt.Errorf("creating device %s: %v", elem.Name, err)
@@ -100,27 +100,28 @@ func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 		}
 		dev.SetNodes(nodeIndices)
 
-		// 전압원 브랜치 인덱스 설정
+		// Branch index for voltage source
 		if v, ok := dev.(*device.VoltageSource); ok {
 			v.SetBranchIndex(c.branchMap[elem.Name])
 		}
 
-		// 인덕터 브랜치 인덱스 설정
+		// Branch index for inductor
 		if l, ok := dev.(*device.Inductor); ok {
 			l.SetBranchIndex(c.branchMap[elem.Name])
 		}
+		if magInd, ok := dev.(*device.MagneticInductor); ok {
+			magInd.SetBranchIndex(c.branchMap[elem.Name])
+		}
 
-		// 비선형 디바이스 처리
 		if nl, ok := dev.(device.NonLinear); ok {
 			c.nonlinearDevices = append(c.nonlinearDevices, nl)
 		}
 
-		// 디바이스 맵과 배열에 추가
 		deviceMap[elem.Name] = dev
 		c.devices = append(c.devices, dev)
 	}
 
-	// 상호 인덕턴스 처리
+	// Create mutual inductance devices
 	for _, elem := range elements {
 		if elem.Type != "K" {
 			continue
@@ -178,7 +179,7 @@ func (c *Circuit) SetTimeStep(dt float64) {
 		c.Status.TimeStep = dt
 	}
 
-	// 모든 시간 의존 소자에 시간 스텝 설정
+	// Set timestep for all time dependent devices
 	for _, dev := range c.devices {
 		if td, ok := dev.(device.TimeDependent); ok {
 			td.SetTimeStep(dt, c.Status)
@@ -189,7 +190,7 @@ func (c *Circuit) SetTimeStep(dt float64) {
 func (c *Circuit) LoadState() {
 	voltages := c.Matrix.Solution()
 
-	// 모든 시간 의존 소자의 상태 로드
+	// Load state of all time dependent devices
 	for _, dev := range c.devices {
 		if td, ok := dev.(device.TimeDependent); ok {
 			td.LoadState(voltages, c.Status)
@@ -200,20 +201,20 @@ func (c *Circuit) LoadState() {
 func (c *Circuit) Update() {
 	solution := c.Matrix.Solution()
 
-	// 모든 시간 의존 소자의 상태 업데이트
+	// Update state of all time dependent devices
 	for _, dev := range c.devices {
 		if td, ok := dev.(device.TimeDependent); ok {
 			td.UpdateState(solution, c.Status)
 		}
 	}
 
-	// 현재 해를 이전 해로 저장
+	// Save solution to previous solution
 	for nodeName, nodeIdx := range c.nodeMap {
 		key := fmt.Sprintf("V(%s)", nodeName)
 		c.prevSolution[key] = solution[nodeIdx]
 	}
 
-	// 브랜치 전류도 저장
+	// Branch current is saved too
 	for devName, branchIdx := range c.branchMap {
 		key := fmt.Sprintf("I(%s)", devName)
 		c.prevSolution[key] = -solution[branchIdx]

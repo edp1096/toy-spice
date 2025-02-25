@@ -52,6 +52,7 @@ type InductorComponent interface {
 	GetVoltage() float64
 	GetPreviousVoltage() float64
 	GetNodes() []int
+	BranchIndex() int
 }
 
 type SourceType int

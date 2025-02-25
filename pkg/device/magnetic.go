@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"toy-spice/pkg/matrix"
+	"toy-spice/pkg/util"
 )
 
 // Constants
@@ -28,14 +29,15 @@ type MagneticCore struct {
 // MagneticInductor 수정
 type MagneticInductor struct {
 	BaseDevice
-	core     *MagneticCore // 기존의 JilesAthertonCore 대신
-	turns    int
-	current0 float64
-	current1 float64
-	flux0    float64
-	flux1    float64
-	voltage0 float64
-	voltage1 float64
+	core      *MagneticCore
+	turns     int
+	current0  float64
+	current1  float64
+	flux0     float64
+	flux1     float64
+	voltage0  float64
+	voltage1  float64
+	branchIdx int
 }
 
 // Jiles-Atherton model parameters
@@ -90,50 +92,45 @@ func (c *JilesAthertonCore) Calculate(h float64, temp float64) (float64, float64
 	c.temp = temp
 	dH := h - c.Hold
 
+	// Keep previous value if too low change
 	if math.Abs(dH) < 1e-12 {
 		return c.M, c.dMdH
 	}
 
-	// Temperature scaling
-	mst := c.Ms * math.Pow((c.tc-temp)/c.tc, c.beta)
-
-	// Effective field including domain coupling
-	he := h + c.alpha*c.M
-
-	// Anhysteretic magnetization using modified Langevin function
-	lan := func(x float64) float64 {
-		if math.Abs(x) < 1e-6 {
-			return x / 3.0
-		}
-		return 1.0/math.Tanh(x) - 1.0/x
-	}
-
-	c.Man = mst * lan(he/c.a)
-
-	// Direction of magnetization change
+	// Magnetize direction
 	delta := 1.0
 	if dH < 0 {
 		delta = -1.0
 	}
 
-	// Irreversible magnetization change
-	denom := c.k*delta - c.alpha*(c.Man-c.Mirr)
+	// 온도 스케일링
+	mst := c.Ms
+	if c.tc > 0 {
+		mst *= math.Pow((c.tc-temp)/c.tc, c.beta)
+	}
+
+	// 유효 자기장
+	he := h + c.alpha*c.M
+
+	var Man float64
+	if math.Abs(he) < 1e-6 {
+		Man = mst * he / (3.0 * c.a)
+	} else {
+		Man = mst * (1.0/math.Tanh(he/c.a) - c.a/he)
+	}
+
+	denom := c.k*delta - c.alpha*(Man-c.Mirr)
 	if math.Abs(denom) < 1e-12 {
 		denom = 1e-12 * math.Copysign(1.0, denom)
 	}
+	dMirr_dH := (Man - c.Mirr) / denom
 
-	dMirrdH := (c.Man - c.Mirr) / denom
-	c.Mirr += dMirrdH * dH
+	c.Mirr += dMirr_dH * dH
 
-	// Total magnetization
-	mold := c.M
-	c.M = c.Mirr + c.c*(c.Man-c.Mirr)
+	Mold := c.M
 
-	// Differential permeability
-	c.dMdH = (c.M - mold) / dH
-	if math.IsNaN(c.dMdH) || math.IsInf(c.dMdH, 0) {
-		c.dMdH = mst / c.a / 3.0 // Initial permeability
-	}
+	c.M = c.Mirr + c.c*(Man-c.Mirr)
+	c.dMdH = (c.M - Mold) / dH
 
 	c.H = h
 	c.Hold = h
@@ -158,7 +155,7 @@ func (m *MagneticInductor) GetValue() float64 {
 	if m.core == nil {
 		return 0
 	}
-	// 코어의 비선형성을 고려한 실효 인덕턴스
+
 	_, dMdH := m.core.Calculate(float64(m.turns)*m.current0/m.core.len, 300.15)
 	return mu0 * float64(m.turns*m.turns) * m.core.area * (1 + dMdH) / m.core.len
 }
@@ -197,7 +194,6 @@ func (m *MagneticInductor) SetCore(params map[string]float64) {
 	}
 
 	m.core = core
-	// 이 인덕터를 코어의 인덕터 리스트에 추가
 	core.AddInductor(m)
 }
 
@@ -211,57 +207,74 @@ func (m *MagneticInductor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStat
 	}
 
 	n1, n2 := m.Nodes[0], m.Nodes[1]
+	bIdx := m.branchIdx
 
 	switch status.Mode {
 	case OperatingPointAnalysis:
-		// DC에서의 최소 컨덕턴스
-		geq := 1e-9
 		if n1 != 0 {
-			matrix.AddElement(n1, n1, geq)
-			if n2 != 0 {
-				matrix.AddElement(n1, n2, -geq)
-			}
+			matrix.AddElement(n1, bIdx, -1)
+			matrix.AddElement(bIdx, n1, -1)
 		}
 		if n2 != 0 {
-			if n1 != 0 {
-				matrix.AddElement(n2, n1, -geq)
-			}
-			matrix.AddElement(n2, n2, geq)
+			matrix.AddElement(n2, bIdx, 1)
+			matrix.AddElement(bIdx, n2, 1)
 		}
+
+		var smallL float64 = 1e-3
+		matrix.AddElement(bIdx, bIdx, smallL)
+
+		m.current0 = 0
+		m.current1 = 0
+		m.flux0 = 0
+		m.flux1 = 0
 
 	case TransientAnalysis:
-		dt := status.TimeStep
-		if dt > 0 {
-			// 자기장 계산
-			h := float64(m.turns) * m.current0 / m.core.len
-			_, dMdH := m.core.Calculate(h, status.Temp)
-
-			// 실효 인덕턴스 계산
-			Leff := mu0 * float64(m.turns*m.turns) *
-				m.core.area * (1 + dMdH) / m.core.len
-
-			// 등가 컨덕턴스
-			geq := dt / (2.0 * Leff)
-
-			// 등가 전류원
-			ieq := m.current1 + geq*(m.voltage1-m.voltage0)
-
-			// 매트릭스 스탬핑
-			if n1 != 0 {
-				matrix.AddElement(n1, n1, geq)
-				if n2 != 0 {
-					matrix.AddElement(n1, n2, -geq)
-				}
-				matrix.AddRHS(n1, ieq)
-			}
-			if n2 != 0 {
-				if n1 != 0 {
-					matrix.AddElement(n2, n1, -geq)
-				}
-				matrix.AddElement(n2, n2, geq)
-				matrix.AddRHS(n2, -ieq)
-			}
+		if n1 != 0 {
+			matrix.AddElement(n1, bIdx, -1)
+			matrix.AddElement(bIdx, n1, -1)
 		}
+		if n2 != 0 {
+			matrix.AddElement(n2, bIdx, 1)
+			matrix.AddElement(bIdx, n2, 1)
+		}
+
+		dt := status.TimeStep
+		if dt <= 0 {
+			dt = 1e-9
+		}
+
+		if status.Time < dt || math.Abs(m.current0) < 1e-9 {
+			mu0 := 4.0e-7 * math.Pi // 진공 투자율
+			L0 := mu0 * float64(m.turns*m.turns) * m.core.area / m.core.len
+
+			// v = L*di/dt => L/dt*i_now - L/dt*i_prev = v
+			coeffs := util.GetIntegratorCoeffs(util.GearMethod, 1, dt)
+			diag := coeffs[0] * L0
+
+			matrix.AddElement(bIdx, bIdx, -diag)
+			matrix.AddRHS(bIdx, diag*m.current1)
+
+			return nil
+		}
+
+		h := float64(m.turns) * m.current0 / m.core.len
+		h = math.Max(-1e6, math.Min(1e6, h))
+
+		_, dMdH := m.core.Calculate(h, status.Temp) // dM/dH
+		dMdH = math.Max(-1e3, math.Min(1e3, dMdH))  // dM/dH limit
+
+		mu0 := 4.0e-7 * math.Pi
+		muEff := mu0 * (1.0 + dMdH)
+		Leff := muEff * float64(m.turns*m.turns) * m.core.area / m.core.len
+
+		Leff = math.Max(1e-12, Leff)
+
+		coeffs := util.GetIntegratorCoeffs(util.GearMethod, 1, dt)
+		diag := coeffs[0] * Leff
+
+		matrix.AddElement(bIdx, bIdx, -diag)
+		rhs := diag * m.current1
+		matrix.AddRHS(bIdx, rhs)
 	}
 
 	return nil
@@ -275,7 +288,6 @@ func (m *MagneticInductor) StampAC(matrix matrix.DeviceMatrix, status *CircuitSt
 	n1, n2 := m.Nodes[0], m.Nodes[1]
 	omega := 2 * math.Pi * status.Frequency
 
-	// AC 해석에서는 동작점에서의 선형화된 인덕턴스 사용
 	h := float64(m.turns) * m.current0 / m.core.len
 	_, dMdH := m.core.Calculate(h, status.Temp)
 	Leff := mu0 * float64(m.turns) * float64(m.turns) *
@@ -301,33 +313,29 @@ func (m *MagneticInductor) StampAC(matrix matrix.DeviceMatrix, status *CircuitSt
 	return nil
 }
 
-func (m *MagneticInductor) UpdateState(voltages []float64, status *CircuitStatus) {
-	// Update voltages
-	v1 := 0.0
-	if m.Nodes[0] != 0 {
-		v1 = voltages[m.Nodes[0]]
-	}
-	v2 := 0.0
-	if m.Nodes[1] != 0 {
-		v2 = voltages[m.Nodes[1]]
-	}
-
+func (m *MagneticInductor) UpdateState(solution []float64, status *CircuitStatus) {
 	m.voltage1 = m.voltage0
-	m.voltage0 = v1 - v2
-
-	// Update currents and flux
 	m.current1 = m.current0
 	m.flux1 = m.flux0
 
+	m.voltage0 = 0
+	if m.Nodes[0] > 0 {
+		m.voltage0 += solution[m.Nodes[0]]
+	}
+	if m.Nodes[1] > 0 {
+		m.voltage0 -= solution[m.Nodes[1]]
+	}
+
+	// Check for branch index
+	if m.branchIdx >= len(solution) || m.branchIdx < 0 {
+		return
+	}
+
+	m.current0 = -solution[m.branchIdx]
+
 	dt := status.TimeStep
 	if dt > 0 {
-		dflux := m.voltage0 * dt
-		m.flux0 += dflux
-
-		// Update current from core model
-		h := float64(m.turns) * m.current0 / m.core.len
-		B, _ := m.core.Calculate(h, status.Temp)
-		m.current0 = B * m.core.area * float64(m.turns) / m.flux0
+		m.flux0 = m.flux1 + m.voltage0*dt
 	}
 }
 
@@ -337,4 +345,20 @@ func (m *MagneticInductor) GetFlux() float64 {
 
 func (m *MagneticInductor) SetFlux(flux float64) {
 	m.flux0 = flux
+}
+
+func (m *MagneticInductor) BranchIndex() int {
+	return m.branchIdx
+}
+
+func (m *MagneticInductor) SetBranchIndex(idx int) {
+	m.branchIdx = idx
+}
+
+func (m *MagneticInductor) GetPreviousCurrent() float64 {
+	return m.current1
+}
+
+func (m *MagneticInductor) GetPreviousVoltage() float64 {
+	return m.voltage1
 }

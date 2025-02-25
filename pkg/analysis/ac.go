@@ -104,7 +104,7 @@ func (ac *ACAnalysis) generateFrequencyPoints() {
 		logStart := math.Log10(ac.startFreq)
 		logStop := math.Log10(ac.stopFreq)
 		step := (logStop - logStart) / float64(ac.numPoints-1)
-		for i := 0; i < ac.numPoints; i++ {
+		for i := range ac.numPoints {
 			ac.frequencies[i] = math.Pow(10, logStart+float64(i)*step)
 		}
 
@@ -112,13 +112,13 @@ func (ac *ACAnalysis) generateFrequencyPoints() {
 		logStart := math.Log2(ac.startFreq)
 		logStop := math.Log2(ac.stopFreq)
 		step := (logStop - logStart) / float64(ac.numPoints-1)
-		for i := 0; i < ac.numPoints; i++ {
+		for i := range ac.numPoints {
 			ac.frequencies[i] = math.Pow(2, logStart+float64(i)*step)
 		}
 
 	case "LIN": // Linear
 		step := (ac.stopFreq - ac.startFreq) / float64(ac.numPoints-1)
-		for i := 0; i < ac.numPoints; i++ {
+		for i := range ac.numPoints {
 			ac.frequencies[i] = ac.startFreq + float64(i)*step
 		}
 	}

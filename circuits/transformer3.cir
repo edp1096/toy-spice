@@ -2,10 +2,10 @@
 Vin 1 0 sin(0 10 1k)
 
 Rp_leak 1 2 0.1
-Lp 2 0 core=CORE1 turns=200
+Lp 2 0 core=CORE1 turns=300
 
-Rs_leak 3 4 0.05
-Ls 3 0 core=CORE1 turns=100
+Rs_leak 3 4 0.1
+Ls 3 0 core=CORE1 turns=150
 Rload 4 0 1000
 
 .model CORE1 core(
