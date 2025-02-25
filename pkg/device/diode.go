@@ -3,8 +3,9 @@ package device
 import (
 	"fmt"
 	"math"
-	"toy-spice/internal/consts"
-	"toy-spice/pkg/matrix"
+
+	"github.com/edp1096/toy-spice/internal/consts"
+	"github.com/edp1096/toy-spice/pkg/matrix"
 )
 
 type Diode struct {

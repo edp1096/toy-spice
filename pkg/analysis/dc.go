@@ -2,8 +2,9 @@ package analysis
 
 import (
 	"fmt"
-	"toy-spice/pkg/circuit"
-	"toy-spice/pkg/device"
+
+	"github.com/edp1096/toy-spice/pkg/circuit"
+	"github.com/edp1096/toy-spice/pkg/device"
 )
 
 type DCSweep struct {

@@ -1,4 +1,4 @@
-module toy-spice
+module github.com/edp1096/toy-spice
 
 go 1.23.4
 

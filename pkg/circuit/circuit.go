@@ -2,9 +2,10 @@ package circuit
 
 import (
 	"fmt"
-	"toy-spice/pkg/device"
-	"toy-spice/pkg/matrix"
-	"toy-spice/pkg/netlist"
+
+	"github.com/edp1096/toy-spice/pkg/device"
+	"github.com/edp1096/toy-spice/pkg/matrix"
+	"github.com/edp1096/toy-spice/pkg/netlist"
 )
 
 type Circuit struct {

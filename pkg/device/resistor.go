@@ -2,7 +2,8 @@ package device
 
 import (
 	"fmt"
-	"toy-spice/pkg/matrix"
+
+	"github.com/edp1096/toy-spice/pkg/matrix"
 )
 
 type Resistor struct {

@@ -4,8 +4,8 @@ import (
 	"math"
 	"math/cmplx"
 
-	"toy-spice/pkg/circuit"
-	"toy-spice/pkg/util"
+	"github.com/edp1096/toy-spice/pkg/circuit"
+	"github.com/edp1096/toy-spice/pkg/util"
 )
 
 const (

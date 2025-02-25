@@ -5,10 +5,10 @@ import (
 	"log"
 	"math"
 
-	"toy-spice/pkg/analysis"
-	"toy-spice/pkg/circuit"
-	"toy-spice/pkg/device"
-	"toy-spice/pkg/netlist"
+	"github.com/edp1096/toy-spice/pkg/analysis"
+	"github.com/edp1096/toy-spice/pkg/circuit"
+	"github.com/edp1096/toy-spice/pkg/device"
+	"github.com/edp1096/toy-spice/pkg/netlist"
 )
 
 func createCircuit() (*circuit.Circuit, error) {

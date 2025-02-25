@@ -6,8 +6,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"toy-spice/pkg/device"
-	"toy-spice/pkg/util"
+
+	"github.com/edp1096/toy-spice/pkg/device"
+	"github.com/edp1096/toy-spice/pkg/util"
 )
 
 type AnalysisType int
