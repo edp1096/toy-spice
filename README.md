@@ -1,4 +1,4 @@
-Toy RLC SPICE
+Toy RLC circuit simulator
 
 ## Build
 ```sh
