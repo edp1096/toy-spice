@@ -3,6 +3,5 @@ VCC 1 0 DC 10
 RB 1 2 10k
 RC 1 3 1k
 Q1 3 2 0 Q2N3904
-*.model Q2N3904 NPN(Is=1e-14 Bf=100 Vaf=100 Cje=8p Cjc=5p Tf=0.1n Tr=10n)
 .model Q2N3904 NPN(Is=7.734e-15 Bf=416.4 Vaf=74.03 Cje=4.493p Cjc=3.638p Tf=0.1n Tr=10n)
 .op
