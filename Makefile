@@ -1,24 +1,24 @@
-.PHONY: default all cmd rr diode1 diode2 bjt clean
+.PHONY: default all spice rr diode1 diode2 bjt clean
 
 default: all
-all: cmd rr diode1 diode2 bjt
+all: spice rr diode1 diode2 bjt
 
 BINARY_DIR := bin
 
-cmd:
-	go build -o $(BINARY_DIR)/ ./$@
+spice:
+	go build -o $(BINARY_DIR)/ ./cmd/$@
 
 rr:
-	go build -o $(BINARY_DIR)/ ./examples/$@
+	go build -o $(BINARY_DIR)/ ./cmd/examples/$@
 
 diode1:
-	go build -o $(BINARY_DIR)/ ./examples/$@
+	go build -o $(BINARY_DIR)/ ./cmd/examples/$@
 
 diode2:
-	go build -o $(BINARY_DIR)/ ./examples/$@
+	go build -o $(BINARY_DIR)/ ./cmd/examples/$@
 
 bjt:
-	go build -o $(BINARY_DIR)/ ./examples/$@
+	go build -o $(BINARY_DIR)/ ./cmd/examples/$@
 
 clean:
 	rm -rf $(BINARY_DIR)/*.exe
