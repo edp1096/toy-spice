@@ -386,95 +386,86 @@ func (m *Mosfet) calculateLevel1Current(vgs, vds, vbs, vth, temp float64) (float
 
 // Level 2 (Grove-Frohman) model current calculation
 func (m *Mosfet) calculateLevel2Current(vgs, vds, vbs, vth, temp float64) (float64, int) {
-	// Effective gate voltage
 	vgst := vgs - vth
 
 	// Physical constants
-	eps0 := 8.85e-14    // Vacuum permittivity (F/cm)
-	epsox := 3.9 * eps0 // Silicon dioxide permittivity
+	eps0 := 8.85e-14     // Vacuum permittivity (F/cm)
+	epsox := 3.9 * eps0  // Silicon dioxide permittivity
+	cox := epsox / m.TOX // Oxide capacitance
 
-	// Oxide capacitance
-	cox := epsox / m.TOX
+	// Fix effective electric field calculation (using vgst, unit conversion)
+	eeff := vgst / (m.TOX * 100) // TOX(m) to cm
 
-	// Mobility including degradation effects
+	// Mobility correction
 	ueff := m.UO
-	if m.UCRIT > 0 {
-		eeff := vgs / m.TOX // Effective field
-		if eeff > m.UCRIT {
-			ueff *= math.Pow(m.UCRIT/eeff, m.UEXP)
-		}
+	if m.UCRIT > 0 && eeff > 0 {
+		ueff /= (1.0 + math.Pow(eeff/m.UCRIT, m.UEXP))
 	}
 
-	// Transconductance parameter with effective mobility
-	beta := ueff * cox * m.W / m.L
-
-	// Channel length modulation
-	var lambda float64
-	if m.LAMBDA > 0 {
-		lambda = m.LAMBDA
-	} else {
-		// Calculate lambda from physical parameters
-		lambda = 0.02 // Simplified approximation
-	}
-
-	// Velocity saturation effect
+	// Fix saturation voltage calculation
 	vdsat := vgst
 	if m.VMAX > 0 {
-		vdsat = math.Min(vgst, m.VMAX*m.L/ueff)
+		// Unit conversion: VMAX(cm/s), ueff(cm²/Vs), L(m)
+		ecrit := m.VMAX / ueff * 100 // V/cm
+		vdsat = math.Min(vgst, ecrit*m.L)
 	}
 
-	// Check operation region
+	// Calculate beta
+	beta := ueff * cox * m.W / (m.L * 100) // Convert L to cm
+
+	// Current calculation (linear/saturation region)
+	var id float64
+	var region int
 	if vds < vdsat {
-		// Linear region
-		id := beta * (vgst*vds - 0.5*vds*vds) * (1.0 + lambda*vds)
-		return id, LINEAR
+		id = beta * (vgst*vds - 0.5*vds*vds) * (1.0 + m.LAMBDA*vds)
+		region = LINEAR
 	} else {
-		// Saturation region
-		id := 0.5 * beta * vdsat * vdsat * (1.0 + lambda*vds)
-		return id, SATURATION
+		id = 0.5 * beta * vdsat * vdsat * (1.0 + m.LAMBDA*vds)
+		region = SATURATION
 	}
+
+	return id, region
 }
 
 // Level 3 (Semi-empirical) model current calculation
 func (m *Mosfet) calculateLevel3Current(vgs, vds, vbs, vth, temp float64) (float64, int) {
-	// Effective gate voltage considering mobility degradation
 	vgst := vgs - vth
+
+	// Mobility degradation
+	vgst_eff := vgst
 	if m.THETA > 0 {
-		vgst = vgst / (1.0 + m.THETA*vgst)
+		vgst_eff = vgst / (1.0 + m.THETA*vgst)
 	}
 
-	// Short-channel effects
-	vdsat := vgst
+	// Threshold voltage adjustment (correct use of ETA)
+	vth_eff := vth
 	if m.ETA > 0 {
-		vdsat = vgst / (1.0 + m.ETA*vgst)
+		vth_eff += m.ETA * vds
 	}
 
-	// Transconductance parameter
-	beta := m.KP * m.W / m.L
-
-	// Adjust beta for narrow channel effect
-	if m.DELTA > 0 {
-		beta = beta / (1.0 + m.DELTA/m.W)
-	}
-
-	// Channel length modulation
-	lambda := m.LAMBDA
-
-	// Saturation voltage modified by KAPPA
+	// Calculate saturation voltage
+	vdsat := vgst_eff
 	if m.KAPPA > 0 {
-		vdsat = vdsat / math.Sqrt(1.0+m.KAPPA*vgst)
+		vdsat = vgst_eff / math.Sqrt(1.0+m.KAPPA*vgst_eff)
 	}
 
-	// Check operation region
-	if vds < vdsat {
-		// Linear region with smoother transition
-		id := beta * (vgst*vds - 0.5*vds*vds/(1.0+m.KAPPA*vgs)) * (1.0 + lambda*vds)
-		return id, LINEAR
-	} else {
-		// Saturation region
-		id := 0.5 * beta * vdsat * vdsat * (1.0 + lambda*vds)
-		return id, SATURATION
+	// Calculate beta (including channel width effect)
+	beta := m.KP * m.W / m.L
+	if m.DELTA > 0 {
+		beta /= (1.0 + m.DELTA/m.W)
 	}
+
+	// Current calculation
+	var id float64
+	var region int
+	if vds < vdsat {
+		id = beta * (vgst_eff*vds - 0.5*vds*vds/(1.0+m.KAPPA*vgst_eff)) * (1.0 + m.LAMBDA*vds)
+		region = LINEAR
+	} else {
+		id = 0.5 * beta * vdsat * vdsat * (1.0 + m.LAMBDA*vds)
+		region = SATURATION
+	}
+	return id, region
 }
 
 // Calculate conductances
