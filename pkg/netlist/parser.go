@@ -402,6 +402,11 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		params["xtb"] = 0.0   // Forward and reverse beta temp. exp
 		params["eg"] = 1.11   // Energy gap
 		params["xti"] = 3.0   // Temp. exponent for Is
+
+		if modelType == "PNP" {
+			params["type"] = 1.0 // PNP = 1, NPN = 0
+		}
+
 	case "NMOS", "PMOS":
 		params["level"] = 1     // 기본 레벨 1
 		params["vto"] = 0.7     // 문턱 전압

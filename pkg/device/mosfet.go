@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/edp1096/toy-spice/internal/consts"
 	"github.com/edp1096/toy-spice/pkg/matrix"
 )
 
@@ -208,12 +207,10 @@ func (m *Mosfet) setDefaultParameters() {
 }
 
 func (m *Mosfet) SetModelParameters(params map[string]float64) {
-	// Level 처리 - Level은 int 타입이므로 별도 처리
 	if levelVal, ok := params["level"]; ok {
 		m.Level = int(levelVal)
 	}
 
-	// Type 처리 - PMOS 또는 NMOS 설정
 	if typeVal, ok := params["type"]; ok {
 		if typeVal == 1.0 {
 			m.Type = "PMOS"
@@ -222,7 +219,6 @@ func (m *Mosfet) SetModelParameters(params map[string]float64) {
 		}
 	}
 
-	// 기타 float64 파라미터 처리
 	paramsSet := map[string]*float64{
 		// Geometry parameters
 		"l":   &m.L,
@@ -293,13 +289,6 @@ func (m *Mosfet) SetModelParameters(params map[string]float64) {
 			*param = value
 		}
 	}
-}
-
-func (m *Mosfet) thermalVoltage(temp float64) float64 {
-	if temp <= 0 {
-		temp = 300.15
-	}
-	return consts.BOLTZMANN * temp / consts.CHARGE
 }
 
 // Calculate threshold voltage with body effect
@@ -525,12 +514,8 @@ func (m *Mosfet) calculateConductances() {
 		}
 
 	case 2, 3:
-		// For level 2 and 3, use numerical approximation
-		// This is a simplified approach - typically full models use analytic derivatives
-		delta := 1e-6 // Small delta for numerical derivatives
-
-		// Original current
-		id0 := m.id
+		delta := 1e-6
+		id0 := m.id // Original current
 
 		// Change in current with small change in vgs
 		idg, _ := m.calculateCurrents(vgs+delta, vds, vbs, 300.15)
@@ -569,13 +554,11 @@ func (m *Mosfet) calculateCapacitances() {
 	// Junction capacitances
 	cbs := m.CBS
 	if cbs == 0 && m.CJ > 0 {
-		// Calculate from junction area if not specified
 		cbs = m.CJ*m.AS + m.CJSW*m.PS
 	}
 
 	cbd := m.CBD
 	if cbd == 0 && m.CJ > 0 {
-		// Calculate from junction area if not specified
 		cbd = m.CJ*m.AD + m.CJSW*m.PD
 	}
 
@@ -611,44 +594,39 @@ func (m *Mosfet) calculateCapacitances() {
 
 // Calculate charges for transient analysis
 func (m *Mosfet) calculateCharges() {
-	// Meyer charge model based on node voltages
 	switch m.region {
 	case CUTOFF:
-		// Cutoff region
 		m.qgs = 0.0
 		m.qgd = 0.0
 		m.qgb = m.cgb * (m.vgs - m.vbs)
 
 	case LINEAR:
-		// Linear region
 		m.qgs = m.cgs * m.vgs
 		m.qgd = m.cgd * m.vgd
 		m.qgb = m.cgb * (m.vgs - m.vbs)
 
 	case SATURATION:
-		// Saturation region
 		m.qgs = m.cgs * m.vgs
 		m.qgd = m.cgd * m.vgd
 		m.qgb = m.cgb * (m.vgs - m.vbs)
 	}
 
-	// Junction charges
 	var cbs, cbd float64
 
 	// Junction capacitances with voltage dependence
 	if m.vbs < 0 {
-		// Reverse biased
+		// Reverse bias
 		cbs = m.CBS / math.Pow(1.0-m.vbs/m.PB, m.MJ)
 	} else {
-		// Forward biased
+		// Forward bias
 		cbs = m.CBS * (1.0 + m.MJ*m.vbs/m.PB)
 	}
 
 	if m.vbd < 0 {
-		// Reverse biased
+		// Reverse bias
 		cbd = m.CBD / math.Pow(1.0-m.vbd/m.PB, m.MJ)
 	} else {
-		// Forward biased
+		// Forward bias
 		cbd = m.CBD * (1.0 + m.MJ*m.vbd/m.PB)
 	}
 
@@ -657,43 +635,28 @@ func (m *Mosfet) calculateCharges() {
 	m.qbd = cbd * m.vbd
 }
 
-// Limit junction voltage to prevent overflow
-func (m *Mosfet) limitJunction(v float64) float64 {
-	if v > 0.9*m.PB {
-		v = 0.9 * m.PB
-	}
-	if v < -5.0 {
-		v = -5.0
-	}
-	return v
-}
-
 // UpdateVoltages from solution vector
 func (m *Mosfet) UpdateVoltages(voltages []float64) error {
-	// 노드 매핑 확인
-	nodeG := m.Nodes[1] // 게이트 노드
-	nodeD := m.Nodes[0] // 드레인 노드
-	nodeS := m.Nodes[2] // 소스 노드
-	nodeB := m.Nodes[3] // 벌크 노드
+	nodeG := m.Nodes[1] // Gate
+	nodeD := m.Nodes[0] // Drain
+	nodeS := m.Nodes[2] // Source
+	nodeB := m.Nodes[3] // Bulk
 
-	// 외부 노드 전압에서 내부 전압으로 변환
 	vg := voltages[nodeG]
 	vd := voltages[nodeD]
 	vs := voltages[nodeS]
 	vb := voltages[nodeB]
 
-	// Type 문자열을 숫자 값으로 변환 (NMOS: +1, PMOS: -1)
+	// Type NMOS: +1, PMOS: -1
 	typeValue := 1.0
 	if m.Type == "PMOS" {
 		typeValue = -1.0
 	}
 
-	// 중요: NMOS/PMOS에 따라 타입 적용
 	m.vgs = typeValue * (vg - vs)
 	m.vds = typeValue * (vd - vs)
 	m.vbs = typeValue * (vb - vs)
 
-	// 추가 계산 (필요시)
 	m.vgd = m.vgs - m.vds
 	m.vbd = m.vbs - m.vds
 
@@ -706,13 +669,11 @@ func (m *Mosfet) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error 
 		return m.StampAC(matrix, status)
 	}
 
-	// Get node indices
 	nd := m.Nodes[0] // Drain
 	ng := m.Nodes[1] // Gate
 	ns := m.Nodes[2] // Source
 	nb := m.Nodes[3] // Bulk
 
-	// Check if we have valid voltages
 	if m.vgs == 0 && m.vds == 0 && m.vbs == 0 {
 		// Initial voltages for first iteration
 		if m.Type == "NMOS" {
@@ -731,18 +692,13 @@ func (m *Mosfet) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error 
 	m.id, m.region = m.calculateCurrents(m.vgs, m.vds, m.vbs, status.Temp)
 	m.prevId = m.id
 
-	// Calculate conductances
 	m.calculateConductances()
-
-	// Calculate capacitances
 	m.calculateCapacitances()
 
-	// Minimum conductance for stability
 	gmin := status.Gmin
 
-	// Add MOSFET elements to the matrix
 	if nd != 0 {
-		// Drain node equations
+		// Drain
 		matrix.AddElement(nd, nd, m.gds+gmin)
 		if ng != 0 {
 			matrix.AddElement(nd, ng, m.gm)
@@ -757,7 +713,7 @@ func (m *Mosfet) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error 
 	}
 
 	if ns != 0 {
-		// Source node equations
+		// Source
 		matrix.AddElement(ns, ns, m.gds+m.gm+m.gmbs+gmin)
 		if nd != 0 {
 			matrix.AddElement(ns, nd, -m.gds)
@@ -771,12 +727,10 @@ func (m *Mosfet) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error 
 		matrix.AddRHS(ns, m.id-m.gds*m.vds-m.gm*m.vgs-m.gmbs*m.vbs)
 	}
 
-	// Gate and bulk nodes only have capacitive coupling in transient
+	// Gate and bulk
 	if status.Mode == TransientAnalysis && status.TimeStep > 0 {
-		// In transient analysis, we need to add capacitive terms
 		dt := status.TimeStep
 
-		// Calculate charges for transient
 		m.calculateCharges()
 
 		// Capacitive currents
@@ -786,7 +740,7 @@ func (m *Mosfet) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error 
 		icbs := (m.qbs - m.prevQbs) / dt
 		icbd := (m.qbd - m.prevQbd) / dt
 
-		// Gate node equations for capacitances
+		// Gate
 		if ng != 0 {
 			if nd != 0 {
 				matrix.AddElement(ng, nd, m.cgd/dt)
@@ -809,7 +763,7 @@ func (m *Mosfet) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error 
 			matrix.AddElement(ng, ng, (m.cgd+m.cgs+m.cgb)/dt)
 		}
 
-		// Bulk node equations for junction capacitances
+		// Bulk
 		if nb != 0 {
 			if ns != 0 {
 				matrix.AddElement(nb, ns, m.CBS/dt)
@@ -830,19 +784,15 @@ func (m *Mosfet) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error 
 	return nil
 }
 
-// StampAC adds small-signal frequency-domain MOSFET terms
 func (m *Mosfet) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
-	// Get node indices
 	nd := m.Nodes[0] // Drain
 	ng := m.Nodes[1] // Gate
 	ns := m.Nodes[2] // Source
 	nb := m.Nodes[3] // Bulk
 
-	// Calculate/update capacitances based on DC operating point
 	m.calculateCapacitances()
 
-	// Angular frequency
-	omega := 2.0 * math.Pi * status.Frequency
+	omega := 2.0 * math.Pi * status.Frequency // Angular frequency
 
 	// Real and imaginary parts for admittance elements
 	gdsi := omega * 0.0   // No imaginary part for drain-source conductance
@@ -854,9 +804,9 @@ func (m *Mosfet) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 	cbsi := omega * m.CBS // Imaginary part for bulk-source capacitance
 	cbdi := omega * m.CBD // Imaginary part for bulk-drain capacitance
 
-	// Add MOSFET elements to the complex matrix
+	// Complex matrix
 	if nd != 0 {
-		// Drain node equations
+		// Drain
 		matrix.AddComplexElement(nd, nd, m.gds, gdsi)
 		if ng != 0 {
 			matrix.AddComplexElement(nd, ng, m.gm, gmi+cgdi)
@@ -870,7 +820,7 @@ func (m *Mosfet) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 	}
 
 	if ns != 0 {
-		// Source node equations
+		// Source
 		matrix.AddComplexElement(ns, ns, m.gds+m.gm+m.gmbs, gdsi+gmi+gmbsi)
 		if nd != 0 {
 			matrix.AddComplexElement(ns, nd, -m.gds, -gdsi)
@@ -884,7 +834,7 @@ func (m *Mosfet) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 	}
 
 	if ng != 0 {
-		// Gate node equations
+		// Gate
 		matrix.AddComplexElement(ng, ng, 0.0, cgsi+cgdi+cgbi)
 		if nd != 0 {
 			matrix.AddComplexElement(ng, nd, 0.0, cgdi)
@@ -898,7 +848,7 @@ func (m *Mosfet) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 	}
 
 	if nb != 0 {
-		// Bulk node equations
+		// Bulk
 		matrix.AddComplexElement(nb, nb, 0.0, cbsi+cbdi+cgbi)
 		if nd != 0 {
 			matrix.AddComplexElement(nb, nd, 0.0, cbdi)
@@ -914,18 +864,14 @@ func (m *Mosfet) StampAC(matrix matrix.DeviceMatrix, status *CircuitStatus) erro
 	return nil
 }
 
-// LoadConductance loads the conductance matrix for nonlinear iteration
 func (m *Mosfet) LoadConductance(matrix matrix.DeviceMatrix) error {
-	// Get node indices
 	nd := m.Nodes[0] // Drain
 	ng := m.Nodes[1] // Gate
 	ns := m.Nodes[2] // Source
 	nb := m.Nodes[3] // Bulk
 
-	// Minimum conductance for stability
 	gmin := 1e-12
 
-	// Add MOSFET conductance elements to the matrix
 	if nd != 0 {
 		matrix.AddElement(nd, nd, m.gds+gmin)
 		if ng != 0 {
@@ -955,9 +901,7 @@ func (m *Mosfet) LoadConductance(matrix matrix.DeviceMatrix) error {
 	return nil
 }
 
-// LoadCurrent loads the current vector for nonlinear iteration
 func (m *Mosfet) LoadCurrent(matrix matrix.DeviceMatrix) error {
-	// Get node indices
 	nd := m.Nodes[0] // Drain
 	ns := m.Nodes[2] // Source
 
@@ -973,53 +917,46 @@ func (m *Mosfet) LoadCurrent(matrix matrix.DeviceMatrix) error {
 	return nil
 }
 
-// UpdateState updates the internal state for transient analysis
 func (m *Mosfet) UpdateState(voltages []float64, status *CircuitStatus) {
-	// Store previous charges
+	// Charge
 	m.prevQgs = m.qgs
 	m.prevQgd = m.qgd
 	m.prevQgb = m.qgb
 	m.prevQbs = m.qbs
 	m.prevQbd = m.qbd
 
-	// Store previous currents
-	m.prevId = m.id
+	m.prevId = m.id // Current
 
-	// Update charges for next timestep
-	m.calculateCharges()
+	m.calculateCharges() // Update charges for next timestep
 }
 
-// GetVgs returns the gate-source voltage
 func (m *Mosfet) GetVgs() float64 {
 	return m.vgs
 }
 
-// GetVds returns the drain-source voltage
 func (m *Mosfet) GetVds() float64 {
 	return m.vds
 }
 
-// GetVbs returns the bulk-source voltage
 func (m *Mosfet) GetVbs() float64 {
 	return m.vbs
 }
 
-// GetId returns the drain current
 func (m *Mosfet) GetId() float64 {
 	return m.id
 }
 
-// GetGm returns the transconductance
+// transconductance
 func (m *Mosfet) GetGm() float64 {
 	return m.gm
 }
 
-// GetGds returns the drain-source conductance
+// drain-source conductance
 func (m *Mosfet) GetGds() float64 {
 	return m.gds
 }
 
-// GetRegion returns the operation region
+// Operation region
 func (m *Mosfet) GetRegion() int {
 	return m.region
 }
