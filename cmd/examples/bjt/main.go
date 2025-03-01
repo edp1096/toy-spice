@@ -148,6 +148,8 @@ func main() {
 		log.Fatalf("error circuit generation: %v", err)
 	}
 
+	ckt.Matrix.PrintSystem()
+
 	fmt.Println("Circuit information:")
 	fmt.Printf("  Name: %s\n", ckt.Name())
 	fmt.Printf("  Node count: %d (except GND)\n\n", ckt.GetNumNodes())

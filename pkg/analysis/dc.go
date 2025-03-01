@@ -152,7 +152,7 @@ func (dc *DCSweep) doNRiter(gmin float64, maxIter int) error {
 		Gmin: gmin,
 	}
 
-	for iter := 0; iter < maxIter; iter++ {
+	for iter := range maxIter {
 		mat.Clear()
 		if iter > 0 {
 			err := ckt.UpdateNonlinearVoltages(oldSolution)

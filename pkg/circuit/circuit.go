@@ -151,6 +151,12 @@ func (c *Circuit) SetupDevices(elements []netlist.Element) error {
 		c.devices = append(c.devices, dev)
 	}
 
+	for _, dev := range c.devices {
+		if bjt, ok := dev.(*device.Bjt); ok {
+			bjt.InitializeOP()
+		}
+	}
+
 	// Initial stamp
 	cktStatus := &device.CircuitStatus{Time: 0}
 	err = c.Stamp(cktStatus)

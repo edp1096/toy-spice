@@ -34,7 +34,7 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 		Gmin: gmin,
 	}
 
-	for iter := 0; iter < maxIter; iter++ {
+	for iter := range maxIter {
 		mat.Clear()
 
 		// First iteration have no previous solution so, skip
@@ -62,9 +62,7 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 			allConverged := true
 			for i := 1; i < len(solution); i++ {
 				diff := math.Abs(solution[i] - oldSolution[i])
-				reltol := op.convergence.reltol*math.Max(
-					math.Abs(solution[i]),
-					math.Abs(oldSolution[i])) + op.convergence.abstol
+				reltol := op.convergence.reltol*math.Max(math.Abs(solution[i]), math.Abs(oldSolution[i])) + op.convergence.abstol
 
 				if diff > reltol {
 					allConverged = false
@@ -94,6 +92,7 @@ func (op *OperatingPoint) Execute() error {
 	if err == nil {
 		solution := mat.Solution()
 		op.storeResults(solution)
+
 		return nil
 	}
 
@@ -116,6 +115,7 @@ func (op *OperatingPoint) Execute() error {
 
 	solution := mat.Solution()
 	op.storeResults(solution)
+
 	return nil
 }
 
