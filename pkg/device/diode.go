@@ -10,6 +10,8 @@ import (
 
 type Diode struct {
 	BaseDevice
+	NonLinear
+
 	// Model parameters
 	Is   float64 // Saturation current 포화 전류
 	N    float64 // Ideality Factor / Emission Coefficient 이상계수 / 발광계수

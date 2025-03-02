@@ -10,6 +10,7 @@ import (
 // Mosfet Levels 1-3 implementation
 type Mosfet struct {
 	BaseDevice
+	NonLinear
 	Type  string // "NMOS" or "PMOS"
 	Level int    // Model level (1-3)
 

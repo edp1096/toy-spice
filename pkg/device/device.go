@@ -55,18 +55,6 @@ type InductorComponent interface {
 	BranchIndex() int
 }
 
-type MosfetComponent interface {
-	Device
-	NonLinear
-	GetVgs() float64
-	GetVds() float64
-	GetVbs() float64
-	GetId() float64
-	GetGm() float64
-	GetGds() float64
-	GetRegion() int
-}
-
 type SourceType int
 
 const (

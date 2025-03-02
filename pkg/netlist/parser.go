@@ -4,11 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/edp1096/toy-spice/pkg/device"
-	"github.com/edp1096/toy-spice/pkg/util"
 )
 
 type AnalysisType int
@@ -320,7 +320,7 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 
 	var supportedModelTypes = []string{"D", "CORE", "NPN", "PNP", "NMOS", "PMOS"}
 
-	if !util.SliceContains(supportedModelTypes, modelType) {
+	if !slices.Contains(supportedModelTypes, modelType) {
 		return fmt.Errorf("unsupported model type: %s", modelType)
 	}
 
