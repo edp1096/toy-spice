@@ -90,11 +90,8 @@ func Parse(input string) (*NetlistData, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-
-		// 앞뒤 공백 제거
 		line = strings.TrimSpace(line)
 
-		// 빈 줄 처리
 		if len(line) == 0 {
 			if currentLine != "" {
 				if err := parseLine(netlistData, currentLine); err != nil {
@@ -106,7 +103,7 @@ func Parse(input string) (*NetlistData, error) {
 			continue
 		}
 
-		// 라인 내 주석 제거
+		// Remove comment part in line
 		if idx := strings.Index(line, "*"); idx >= 0 {
 			line = strings.TrimSpace(line[:idx])
 			if len(line) == 0 {
@@ -114,7 +111,7 @@ func Parse(input string) (*NetlistData, error) {
 			}
 		}
 
-		// 전체 주석 라인 처리
+		// Remove comment line
 		if strings.HasPrefix(line, "*") {
 			if currentLine != "" {
 				if err := parseLine(netlistData, currentLine); err != nil {
@@ -126,7 +123,7 @@ func Parse(input string) (*NetlistData, error) {
 			continue
 		}
 
-		// 라인 이어짐 처리
+		// Line continuation
 		if strings.HasPrefix(line, "+") {
 			line = strings.TrimPrefix(line, "+")
 			line = strings.TrimSpace(line)
@@ -137,7 +134,6 @@ func Parse(input string) (*NetlistData, error) {
 			continue
 		}
 
-		// 들여쓰기로 이어진 라인 처리
 		if continuationMode && strings.HasPrefix(scanner.Text(), " ") {
 			line = strings.TrimSpace(line)
 			if currentLine != "" {
@@ -146,7 +142,7 @@ func Parse(input string) (*NetlistData, error) {
 			continue
 		}
 
-		// 새로운 라인 시작
+		// New line
 		if currentLine != "" {
 			if err := parseLine(netlistData, currentLine); err != nil {
 				return nil, err
@@ -156,7 +152,7 @@ func Parse(input string) (*NetlistData, error) {
 		continuationMode = false
 	}
 
-	// 마지막 라인 처리
+	// Last line - TODO: .END
 	if currentLine != "" {
 		if err := parseLine(netlistData, currentLine); err != nil {
 			return nil, err
@@ -167,8 +163,7 @@ func Parse(input string) (*NetlistData, error) {
 }
 
 func parseLine(netlistData *NetlistData, line string) error {
-	// 라인 내 연속된 공백을 단일 공백으로 변환
-	line = regexp.MustCompile(`\s+`).ReplaceAllString(line, " ")
+	line = regexp.MustCompile(`\s+`).ReplaceAllString(line, " ") // Remove multiple spaces
 
 	if strings.HasPrefix(line, ".") {
 		return parseDotOperator(netlistData, line)
@@ -301,7 +296,7 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 
 	modelName := fields[0]
 
-	// 두번째 필드에서 타입과 괄호 시작 분리
+	// Model type
 	typeField := fields[1]
 	modelType := ""
 	hasOpenParen := false
@@ -310,7 +305,7 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		parts := strings.SplitN(typeField, "(", 2)
 		modelType = strings.ToUpper(parts[0])
 		hasOpenParen = true
-		// 나머지 부분을 다시 fields에 추가
+
 		if len(parts) > 1 {
 			fields = append(fields[:2], append([]string{parts[1]}, fields[2:]...)...)
 		}
@@ -324,13 +319,13 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		return fmt.Errorf("unsupported model type: %s", modelType)
 	}
 
-	// 파라미터 문자열 구성
+	// Model parameters
 	var paramStr string
 	if hasOpenParen {
-		// 괄호가 있는 경우 나머지 필드들을 결합
+		// If parentheses
 		paramParts := fields[2:]
 		if len(paramParts) > 0 {
-			// 마지막 필드의 닫는 괄호 처리
+			// Trim trailing parenthesis
 			last := paramParts[len(paramParts)-1]
 			if strings.HasSuffix(last, ")") {
 				paramParts[len(paramParts)-1] = strings.TrimSuffix(last, ")")
@@ -338,19 +333,18 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		}
 		paramStr = strings.Join(paramParts, " ")
 	} else if len(fields) > 2 {
-		// 괄호가 없는 경우 나머지 필드들을 결합
+		// If no parentheses
 		paramStr = strings.Join(fields[2:], " ")
-		// 마지막 닫는 괄호 제거
-		paramStr = strings.TrimSuffix(paramStr, ")")
+		paramStr = strings.TrimSuffix(paramStr, ")") // Trim trailing parenthesis
 	}
 
-	// 파라미터 문자열에서 주석 제거
+	// Remove comments
 	paramStr = regexp.MustCompile(`\*.*$`).ReplaceAllString(paramStr, "")
 	paramStr = strings.TrimSpace(paramStr)
 
 	params := make(map[string]float64)
 
-	// 기본값 설정
+	// Default model parameters
 	switch modelType {
 	case "D":
 		params["is"] = 1e-14 // Saturation current
@@ -378,7 +372,7 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		params["len"] = 0.1    // Mean path length
 
 	case "NPN", "PNP":
-		// BJT 기본 파라미터 설정
+		// BJT
 		params["is"] = 1e-16  // Transport saturation current
 		params["bf"] = 100.0  // Ideal maximum forward beta
 		params["br"] = 1.0    // Ideal maximum reverse beta
@@ -408,28 +402,28 @@ func parseModel(netlistData *NetlistData, fields []string) error {
 		}
 
 	case "NMOS", "PMOS":
-		params["level"] = 1     // 기본 레벨 1
-		params["vto"] = 0.7     // 문턱 전압
-		params["kp"] = 2e-5     // 트랜스컨덕턴스 파라미터
-		params["gamma"] = 0.5   // 기판 효과 계수
-		params["phi"] = 0.6     // 표면 포텐셜
-		params["lambda"] = 0.01 // 채널 길이 변조 파라미터
-		params["rd"] = 0.0      // 드레인 저항
-		params["rs"] = 0.0      // 소스 저항
-		params["cbd"] = 0.0     // 벌크-드레인 접합 캐패시턴스
-		params["cbs"] = 0.0     // 벌크-소스 접합 캐패시턴스
-		params["is"] = 1e-14    // 벌크 접합 포화 전류
-		params["pb"] = 0.8      // 벌크 접합 전위
-		params["cgso"] = 0.0    // 게이트-소스 오버랩 캐패시턴스
-		params["cgdo"] = 0.0    // 게이트-드레인 오버랩 캐패시턴스
-		params["cgbo"] = 0.0    // 게이트-벌크 오버랩 캐패시턴스
-		params["cj"] = 0.0      // 벌크 접합 캐패시턴스
-		params["mj"] = 0.5      // 벌크 접합 기울기 계수
-		params["cjsw"] = 0.0    // 벌크 접합 측벽 캐패시턴스
-		params["mjsw"] = 0.33   // 벌크 접합 측벽 기울기 계수
-		params["tox"] = 1e-7    // 산화막 두께
-		params["l"] = 10e-6     // 채널 길이
-		params["w"] = 10e-6     // 채널 폭
+		params["level"] = 1     // MOSFET level
+		params["vto"] = 0.7     // Knee voltage (threshold voltage)
+		params["kp"] = 2e-5     // Transconductance parameter
+		params["gamma"] = 0.5   // Substrate (body) effect coefficient
+		params["phi"] = 0.6     // Surface potential
+		params["lambda"] = 0.01 // Channel-length modulation parameter
+		params["rd"] = 0.0      // Drain resistance
+		params["rs"] = 0.0      // Source resistance
+		params["cbd"] = 0.0     // Bulk-drain junction capacitance
+		params["cbs"] = 0.0     // Bulk-source junction capacitance
+		params["is"] = 1e-14    // Bulk junction saturation current
+		params["pb"] = 0.8      // Bulk junction potential
+		params["cgso"] = 0.0    // Gate-source overlap capacitance
+		params["cgdo"] = 0.0    // Gate-drain overlap capacitance
+		params["cgbo"] = 0.0    // Gate-bulk overlap capacitance
+		params["cj"] = 0.0      // Bulk junction capacitance
+		params["mj"] = 0.5      // Bulk junction grading coefficient
+		params["cjsw"] = 0.0    // Bulk junction sidewall capacitance
+		params["mjsw"] = 0.33   // Bulk junction sidewall grading coefficient
+		params["tox"] = 1e-7    // Oxide thickness
+		params["l"] = 10e-6     // Channel length
+		params["w"] = 10e-6     // Channel width
 
 		if modelType == "PMOS" {
 			params["type"] = 1.0 // PMOS = 1, NMOS = 0
@@ -503,12 +497,12 @@ func parseElement(line string) (*Element, error) {
 
 		return elem, nil
 
-	case "K": // 상호 인덕턴스
+	case "K":
 		if len(fields) < 4 {
 			return nil, fmt.Errorf("insufficient mutual coupling parameters: need coupling name, inductors and coefficient")
 		}
 
-		// 마지막 필드가 결합 계수
+		// Coupling factor - last field
 		coefficient, err := ParseValue(fields[len(fields)-1])
 		if err != nil {
 			return nil, fmt.Errorf("invalid coupling coefficient: %v", err)
@@ -517,7 +511,7 @@ func parseElement(line string) (*Element, error) {
 			return nil, fmt.Errorf("coupling coefficient must be between -1 and 1: %f", coefficient)
 		}
 
-		// 중간의 모든 필드들은 인덕터 이름들
+		// Inductor names - 2nd to last-1 in fields
 		indNames := fields[1 : len(fields)-1]
 		if len(indNames) < 2 {
 			return nil, fmt.Errorf("mutual coupling requires at least two inductors")
@@ -533,7 +527,7 @@ func parseElement(line string) (*Element, error) {
 	case "D":
 		elem.Nodes = fields[1:3]
 		if len(fields) > 3 {
-			// 인라인 파라미터 나중에
+			// TODO: Inline parameters
 			elem.Params["model"] = fields[3]
 		}
 

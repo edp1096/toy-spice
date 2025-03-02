@@ -79,7 +79,6 @@ func (tr *Transient) Execute() error {
 		return fmt.Errorf("circuit not set")
 	}
 
-	// 초기 상태 계산
 	if !tr.useUIC {
 		err := tr.op.Setup(tr.Circuit)
 		if err != nil {
@@ -91,9 +90,8 @@ func (tr *Transient) Execute() error {
 		}
 	}
 
-	// 초기 시간 스텝과 방법 설정
 	tr.timeStep = tr.minStep
-	methodState := device.BE // 시작은 BE로
+	methodState := device.BE
 
 	for tr.time < tr.stopTime {
 		nextTime := tr.time + tr.timeStep
@@ -112,7 +110,6 @@ func (tr *Transient) Execute() error {
 		}
 		tr.Circuit.Status = status
 
-		// NR 반복
 		err := tr.doNRiter(0, tr.convergence.maxIter)
 		if err != nil {
 			if tr.timeStep > tr.minStep {
@@ -122,7 +119,6 @@ func (tr *Transient) Execute() error {
 			return fmt.Errorf("failed to converge at t=%g", tr.time)
 		}
 
-		// LTE 검사
 		lte := tr.calculateTruncError()
 		if lte > tr.trtol {
 			if tr.timeStep > tr.minStep {
@@ -131,24 +127,21 @@ func (tr *Transient) Execute() error {
 			}
 		}
 
-		// 방법 전환 검사 (BE -> TR)
+		// BE -> TR
 		if methodState == device.BE && tr.time > 0 {
 			if lte < tr.trtol/10 {
 				methodState = device.TR
 			}
 		}
 
-		// 상태 업데이트
 		tr.Circuit.LoadState()
 		tr.Circuit.Update()
 		tr.time = nextTime
 
-		// 결과 저장
 		if tr.time >= tr.startTime {
 			tr.StoreTimeResult(tr.time, tr.Circuit.GetSolution())
 		}
 
-		// 시간 스텝 조정
 		if tr.time < tr.stopTime && tr.timeStep < tr.maxStep {
 			if lte < tr.trtol/100 {
 				tr.timeStep = math.Min(tr.timeStep*2, tr.maxStep)

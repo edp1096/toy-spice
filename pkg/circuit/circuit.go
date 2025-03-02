@@ -171,6 +171,7 @@ func (c *Circuit) Stamp(status *device.CircuitStatus) error {
 			return fmt.Errorf("stamping device %s: %v", dev.GetName(), err)
 		}
 	}
+
 	return nil
 }
 
@@ -307,5 +308,6 @@ func (c *Circuit) UpdateNonlinearVoltages(solution []float64) error {
 			return fmt.Errorf("updating voltages: %v", err)
 		}
 	}
+
 	return nil
 }

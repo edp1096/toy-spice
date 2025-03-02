@@ -8,10 +8,8 @@ import (
 	"github.com/edp1096/toy-spice/pkg/util"
 )
 
-// Constants
-const mu0 = 4 * math.Pi * 1e-7 // 진공 투자율 (H/m)
+const mu0 = 4 * math.Pi * 1e-7 // Vacuum permeability (H/m)
 
-// Magnetic component interface
 type MagneticComponent interface {
 	Device
 	GetFlux() float64
@@ -21,13 +19,11 @@ type MagneticComponent interface {
 	SetCore(params map[string]float64)
 }
 
-// 변압기 인스턴스들을 관리하는 타입
 type MagneticCore struct {
 	JilesAthertonCore
-	inductors []*MagneticInductor // 코어를 공유하는 인덕터들
+	inductors []*MagneticInductor // Inductors in the core
 }
 
-// MagneticInductor 수정
 type MagneticInductor struct {
 	BaseDevice
 	core      *MagneticCore
@@ -93,24 +89,20 @@ func (c *JilesAthertonCore) Calculate(h float64, temp float64) (float64, float64
 	c.temp = temp
 	dH := h - c.Hold
 
-	// Keep previous value if too low change
 	if math.Abs(dH) < 1e-12 {
 		return c.M, c.dMdH
 	}
 
-	// Magnetize direction
 	delta := 1.0
 	if dH < 0 {
 		delta = -1.0
 	}
 
-	// 온도 스케일링
 	mst := c.Ms
 	if c.tc > 0 {
 		mst *= math.Pow((c.tc-temp)/c.tc, c.beta)
 	}
 
-	// 유효 자기장
 	he := h + c.alpha*c.M
 
 	var Man float64
@@ -171,7 +163,7 @@ func (m *MagneticInductor) GetVoltage() float64 {
 
 func (m *MagneticInductor) SetCore(params map[string]float64) {
 	core := NewMagneticCore()
-	// JilesAthertonCore 파라미터 설정
+
 	if ms, ok := params["ms"]; ok {
 		core.Ms = ms
 	}
@@ -245,7 +237,7 @@ func (m *MagneticInductor) Stamp(matrix matrix.DeviceMatrix, status *CircuitStat
 		}
 
 		if status.Time < dt || math.Abs(m.current0) < 1e-9 {
-			mu0 := 4.0e-7 * math.Pi // 진공 투자율
+			mu0 := 4.0e-7 * math.Pi // Vacuum permeability
 			L0 := mu0 * float64(m.turns*m.turns) * m.core.area / m.core.len
 
 			// v = L*di/dt => L/dt*i_now - L/dt*i_prev = v

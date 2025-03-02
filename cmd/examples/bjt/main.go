@@ -18,19 +18,19 @@ func createCircuit() (*circuit.Circuit, error) {
 
 	// BJT model (2N2222 NPN transistor)
 	bjtModel := device.ModelParam{
-		Type: "NPN",
 		Name: "Q2N2222",
 		Params: map[string]float64{
-			"is":  1.8e-14, // Saturation current
-			"bf":  100,     // Forward beta
-			"vaf": 100,     // Early voltage
-			"ikf": 0.3,     // Forward knee current
-			"rc":  0.3,     // Collector resistance
-			"re":  0.2,     // Emitter resistance
-			"rb":  10,      // Base resistance
-			"cje": 22e-12,  // Base-Emitter junction capacitance
-			"cjc": 8e-12,   // Base-Collector junction capacitance
-			"tf":  0.3e-9,  // Forward transit time
+			"type": 0.0,     // 0 for NPN, 1 for PNP
+			"is":   1.8e-14, // Saturation current
+			"bf":   100,     // Forward beta
+			"vaf":  100,     // Early voltage
+			"ikf":  0.3,     // Forward knee current
+			"rc":   0.3,     // Collector resistance
+			"re":   0.2,     // Emitter resistance
+			"rb":   10,      // Base resistance
+			"cje":  22e-12,  // Base-Emitter junction capacitance
+			"cjc":  8e-12,   // Base-Collector junction capacitance
+			"tf":   0.3e-9,  // Forward transit time
 		},
 	}
 
@@ -87,14 +87,14 @@ func createCircuit() (*circuit.Circuit, error) {
 			Type:   "C",
 			Name:   "Cin",
 			Nodes:  []string{"in", "b"},
-			Value:  10e-6, // 10uF 입력 커플링 캐패시터
+			Value:  10e-6, // 10uF input coupling capacitor
 			Params: map[string]string{},
 		},
 		{
 			Type:   "C",
 			Name:   "Cout",
 			Nodes:  []string{"c", "out"},
-			Value:  10e-6, // 10uF 출력 커플링 캐패시터
+			Value:  10e-6, // 10uF output coupling capacitor
 			Params: map[string]string{},
 		},
 		// Load resistance
@@ -102,7 +102,7 @@ func createCircuit() (*circuit.Circuit, error) {
 			Type:   "R",
 			Name:   "RL",
 			Nodes:  []string{"out", "0"},
-			Value:  10000.0, // 10kΩ 부하 저항
+			Value:  10000.0, // 10kΩ
 			Params: map[string]string{},
 		},
 		// Emitter bypass capacitor
@@ -110,7 +110,7 @@ func createCircuit() (*circuit.Circuit, error) {
 			Type:   "C",
 			Name:   "Ce",
 			Nodes:  []string{"e", "0"},
-			Value:  100e-6, // 100uF 이미터 바이패스 캐패시터
+			Value:  100e-6, // 100uF
 			Params: map[string]string{},
 		},
 		// BJT

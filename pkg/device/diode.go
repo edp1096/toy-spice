@@ -13,12 +13,12 @@ type Diode struct {
 	NonLinear
 
 	// Model parameters
-	Is   float64 // Saturation current 포화 전류
-	N    float64 // Ideality Factor / Emission Coefficient 이상계수 / 발광계수
+	Is   float64 // Saturation current
+	N    float64 // Ideality Factor / Emission Coefficient
 	Rs   float64 // Serial resistance
 	Cj0  float64 // Zero-Bias junction capacitance
-	M    float64 // Grading Coefficient 접합 기울기 계수
-	Vj   float64 // Built-in Potential 접합 전위
+	M    float64 // Grading Coefficient
+	Vj   float64 // Built-in Potential
 	Bv   float64 // Breakdown voltage
 	Gmin float64 // Minimum Conductance
 
@@ -61,11 +61,11 @@ func (d *Diode) GetType() string { return "D" }
 
 func (d *Diode) setDefaultParameters() {
 	d.Is = 1e-14   // 1e-14 A
-	d.N = 1.0      // Ideality Factor / Emission Coefficient 이상계수 / 발광계수
+	d.N = 1.0      // Ideality Factor / Emission Coefficient
 	d.Rs = 0.0     // Serial resistance. not yet use
 	d.Cj0 = 0.0    // Zero-Bias junction capacitance. not yet use
-	d.M = 0.5      // Grading Coefficient 접합 기울기 계수
-	d.Vj = 1.0     // Built-in Potential 접합 전위
+	d.M = 0.5      // Grading Coefficient
+	d.Vj = 1.0     // Built-in Potential
 	d.Bv = 100.0   // Breakdown voltage
 	d.Gmin = 1e-12 // Minimum Conductance
 

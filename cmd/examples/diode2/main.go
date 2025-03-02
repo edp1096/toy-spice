@@ -14,7 +14,6 @@ import (
 func createCircuit() (*circuit.Circuit, error) {
 	ckt := circuit.NewWithComplex("Diode DC Sweep Circuit", false)
 
-	// 다이오드 모델 정의
 	diodeModel := device.ModelParam{
 		Type: "D",
 		Name: "D1N4148",
