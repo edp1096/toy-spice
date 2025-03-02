@@ -6,6 +6,7 @@ import (
 
 	"github.com/edp1096/toy-spice/pkg/circuit"
 	"github.com/edp1096/toy-spice/pkg/device"
+	"github.com/edp1096/toy-spice/pkg/matrix"
 )
 
 type OperatingPoint struct{ BaseAnalysis }
@@ -53,6 +54,7 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 
 		err = mat.Solve()
 		if err != nil {
+			mat.PrintSystem()
 			return fmt.Errorf("matrix solve error: %v", err)
 		}
 
@@ -86,63 +88,38 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 
 func (op *OperatingPoint) calculateInitialEstimate() []float64 {
 	ckt := op.Circuit
-	nodeMap := ckt.GetNodeMap()
-	branchMap := ckt.GetBranchMap()
-	size := len(nodeMap) + len(branchMap)
+	size := ckt.GetMatrix().Size
 
-	initialSolution := make([]float64, size+1)
+	initialMatrix := matrix.NewMatrix(size, false)
 
 	for _, dev := range ckt.GetDevices() {
-		if v, ok := dev.(*device.VoltageSource); ok {
-			nodes := v.GetNodes()
-			value := v.GetValue()
-
-			if nodes[0] == 0 && nodes[1] > 0 {
-				initialSolution[nodes[1]] = value
-			} else if nodes[1] == 0 && nodes[0] > 0 {
-				initialSolution[nodes[0]] = value
-			}
+		if _, isNonlinear := dev.(device.NonLinear); !isNonlinear {
+			dev.Stamp(initialMatrix, ckt.Status)
 		}
 	}
 
-	for _, dev := range ckt.GetDevices() {
-		if bjt, ok := dev.(*device.Bjt); ok {
-			nc := bjt.GetNodes()[0]
-			nb := bjt.GetNodes()[1]
-			ne := bjt.GetNodes()[2]
-
-			if ne > 0 {
-				initialSolution[ne] = 0.2
-			}
-			if nb > 0 {
-				initialSolution[nb] = initialSolution[ne] + 0.7
-			}
-			if nc > 0 {
-				vcc := 12.0
-				for _, voltage := range initialSolution {
-					if voltage > vcc/2 {
-						vcc = voltage
-					}
-				}
-				initialSolution[nc] = vcc / 2
-			}
-		}
+	err := initialMatrix.Solve()
+	if err != nil {
+		fmt.Println("failed to calculate initial estimate:", err)
+		return nil
 	}
 
-	return initialSolution
+	return initialMatrix.Solution()
 }
 
 func (op *OperatingPoint) performSourceStepping() error {
 	ckt := op.Circuit
 
+	// Store original source values
 	originalSources := make(map[string]float64)
 	for _, dev := range ckt.GetDevices() {
 		if v, ok := dev.(*device.VoltageSource); ok {
 			originalSources[v.GetName()] = v.GetValue()
-			v.SetValue(v.GetValue() * 0.05)
+			v.SetValue(v.GetValue() * 0.1)
 		}
 	}
 
+	// Restore original source values
 	defer func() {
 		for name, origValue := range originalSources {
 			for _, dev := range ckt.GetDevices() {
@@ -155,9 +132,10 @@ func (op *OperatingPoint) performSourceStepping() error {
 		}
 	}()
 
-	steps := []float64{0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 1.0}
+	// Increase 10% -> 100%
+	for factor := 0.1; factor <= 1.0; factor += 0.1 {
+		fmt.Printf("Source stepping: %.0f%%\n", factor*100)
 
-	for _, factor := range steps {
 		for name, origValue := range originalSources {
 			for _, dev := range ckt.GetDevices() {
 				if dev.GetName() == name {
@@ -168,21 +146,16 @@ func (op *OperatingPoint) performSourceStepping() error {
 			}
 		}
 
-		initialSolution := op.calculateInitialEstimate()
-		if initialSolution != nil {
-			ckt.UpdateNonlinearVoltages(initialSolution)
-		}
-
 		err := op.doNRiter(0, op.convergence.maxIter)
 		if err != nil {
-			continue
+			return fmt.Errorf("source stepping failed at %.0f%%: %v", factor*100, err)
 		}
 	}
 
 	return nil
 }
 
-func (op *OperatingPoint) ExecuteNotUse() error {
+func (op *OperatingPoint) Execute() error {
 	ckt := op.Circuit
 	mat := ckt.GetMatrix()
 
@@ -217,7 +190,7 @@ func (op *OperatingPoint) ExecuteNotUse() error {
 	return nil
 }
 
-func (op *OperatingPoint) Execute() error {
+func (op *OperatingPoint) ExecuteNotUse() error {
 	ckt := op.Circuit
 	mat := ckt.GetMatrix()
 
@@ -236,7 +209,7 @@ func (op *OperatingPoint) Execute() error {
 		return nil
 	}
 
-	fmt.Println("Newton-Raphson failed, trying Gmin stepping...")
+	fmt.Println("Newton-Raphson failed, trying Gmin stepping...", err)
 	numGminSteps := 10
 	startGmin := float64(mat.Size) * 0.001
 	gmin := startGmin * math.Pow(10, float64(numGminSteps))
@@ -256,7 +229,7 @@ func (op *OperatingPoint) Execute() error {
 		return nil
 	}
 
-	fmt.Println("Gmin stepping failed, performing source stepping...")
+	fmt.Println("Gmin stepping failed, performing source stepping...", err)
 	err = op.performSourceStepping()
 	if err != nil {
 		return fmt.Errorf("source stepping failed: %v", err)
