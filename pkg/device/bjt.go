@@ -277,7 +277,7 @@ func (b *Bjt) calculateConductances(temp float64) {
 		b.gout = 1e-12
 	}
 
-	// fmt.Println("b.vbe, b.Nf, vt, expVbe, dIes_dVbe, gm, gpi, gout", b.vbe, b.Nf, vt, expVbe, dIes_dVbe, b.gm, b.gpi, b.gout)
+	fmt.Println("b.vbe, b.Nf, vt, expVbe, dIes_dVbe, gm, gpi, gout", b.vbe, b.Nf, vt, expVbe, dIes_dVbe, b.gm, b.gpi, b.gout)
 }
 
 func (b *Bjt) UpdateVoltages(voltages []float64) error {
@@ -307,7 +307,7 @@ func (b *Bjt) UpdateVoltages(voltages []float64) error {
 	// b.vbc = vc - vb
 	// b.vce = ve - vc
 
-	// fmt.Printf("Calculated voltages: Type: %s, VBE=%.12f, VBC=%.12f, VCE=%.12f\n", b.Type, b.vbe, b.vbc, b.vce)
+	fmt.Printf("Calculated voltages: Type: %s, VBE=%.12f, VBC=%.12f, VCE=%.12f\n", b.Type, b.vbe, b.vbc, b.vce)
 
 	return nil
 }

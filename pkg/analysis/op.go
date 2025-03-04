@@ -22,12 +22,19 @@ func (op *OperatingPoint) Setup(ckt *circuit.Circuit) error {
 	return nil
 }
 
-func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
+func (op *OperatingPoint) doNRiter(gmin float64, maxIter int, initialSolution []float64) error {
 	var err error
-
 	ckt := op.Circuit
 	mat := ckt.GetMatrix()
 	var oldSolution []float64
+
+	if initialSolution != nil {
+		oldSolution = make([]float64, len(initialSolution))
+		copy(oldSolution, initialSolution)
+	} else {
+		oldSolution = make([]float64, mat.Size+1)
+	}
+
 	ckt.Status = &device.CircuitStatus{
 		Time: 0,
 		Mode: device.OperatingPointAnalysis,
@@ -35,27 +42,19 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 		Gmin: gmin,
 	}
 
-	// initialVoltages := make([]float64, mat.Size+1)
-	// for i := range initialVoltages {
-	// 	initialVoltages[i] = 0.0
-	// }
-	// ckt.UpdateNonlinearVoltages(initialVoltages)
-
 	for iter := range maxIter {
 		mat.Clear()
 
-		// First iteration have no previous solution so, skip
-		if iter > 0 {
-			err = ckt.UpdateNonlinearVoltages(oldSolution)
-			if err != nil {
-				return fmt.Errorf("updating nonlinear voltages: %v", err)
-			}
+		err = ckt.UpdateNonlinearVoltages(oldSolution)
+		if err != nil {
+			return fmt.Errorf("updating nonlinear voltages: %v", err)
 		}
 
 		err = ckt.Stamp(ckt.Status)
 		if err != nil {
 			return fmt.Errorf("stamping error: %v", err)
 		}
+
 		mat.LoadGmin(gmin)
 
 		err = mat.Solve()
@@ -82,9 +81,6 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 			}
 		}
 
-		if oldSolution == nil {
-			oldSolution = make([]float64, len(solution))
-		}
 		copy(oldSolution, solution)
 	}
 
@@ -111,15 +107,13 @@ func (op *OperatingPoint) calculateInitialEstimate() []float64 {
 	}
 
 	result := initialMatrix.Solution()
-	fmt.Println("initial solution:", result)
-
 	return result
 }
 
 func (op *OperatingPoint) performSourceStepping() error {
 	ckt := op.Circuit
+	mat := ckt.GetMatrix()
 
-	// Store original source values
 	originalSources := make(map[string]float64)
 	for _, dev := range ckt.GetDevices() {
 		if v, ok := dev.(*device.VoltageSource); ok {
@@ -128,7 +122,6 @@ func (op *OperatingPoint) performSourceStepping() error {
 		}
 	}
 
-	// Restore original source values
 	defer func() {
 		for name, origValue := range originalSources {
 			for _, dev := range ckt.GetDevices() {
@@ -140,6 +133,15 @@ func (op *OperatingPoint) performSourceStepping() error {
 			}
 		}
 	}()
+
+	initialSolution := op.calculateInitialEstimate()
+	var currentSolution []float64
+
+	if initialSolution != nil {
+		currentSolution = initialSolution
+	} else {
+		currentSolution = make([]float64, mat.Size+1)
+	}
 
 	// Increase 10% -> 100%
 	for factor := 0.1; factor <= 1.0; factor += 0.1 {
@@ -155,46 +157,13 @@ func (op *OperatingPoint) performSourceStepping() error {
 			}
 		}
 
-		err := op.doNRiter(0, op.convergence.maxIter)
+		err := op.doNRiter(0, op.convergence.maxIter, currentSolution)
 		if err != nil {
 			return fmt.Errorf("source stepping failed at %.0f%%: %v", factor*100, err)
 		}
+
+		currentSolution = mat.Solution()
 	}
-
-	return nil
-}
-
-func (op *OperatingPoint) ExecuteNotUse() error {
-	ckt := op.Circuit
-	mat := ckt.GetMatrix()
-
-	err := op.doNRiter(0, op.convergence.maxIter)
-	if err == nil {
-		solution := mat.Solution()
-		op.storeResults(solution)
-
-		return nil
-	}
-
-	numGminSteps := 10
-	startGmin := float64(mat.Size) * 0.001
-	gmin := startGmin * math.Pow(10, float64(numGminSteps))
-
-	for i := 0; i <= numGminSteps; i++ {
-		err := op.doNRiter(gmin, op.convergence.maxIter)
-		if err != nil {
-			return fmt.Errorf("gmin stepping failed at %g: %v", gmin, err)
-		}
-		gmin /= 10
-	}
-
-	err = op.doNRiter(0, op.convergence.maxIter)
-	if err != nil {
-		return fmt.Errorf("final solution failed with zero gmin: %v", err)
-	}
-
-	solution := mat.Solution()
-	op.storeResults(solution)
 
 	return nil
 }
@@ -203,6 +172,7 @@ func (op *OperatingPoint) Execute() error {
 	ckt := op.Circuit
 	mat := ckt.GetMatrix()
 
+	// 선형 소자만으로 초기 추정값 계산
 	initialSolution := op.calculateInitialEstimate()
 	if initialSolution != nil {
 		err := ckt.UpdateNonlinearVoltages(initialSolution)
@@ -211,7 +181,8 @@ func (op *OperatingPoint) Execute() error {
 		}
 	}
 
-	err := op.doNRiter(0, op.convergence.maxIter)
+	// 초기 해를 doNRiter에 전달하여 Newton-Raphson 수행
+	err := op.doNRiter(0, op.convergence.maxIter, initialSolution)
 	if err == nil {
 		solution := mat.Solution()
 		op.storeResults(solution)
@@ -223,15 +194,19 @@ func (op *OperatingPoint) Execute() error {
 	startGmin := float64(mat.Size) * 0.001
 	gmin := startGmin * math.Pow(10, float64(numGminSteps))
 
+	// 현재 솔루션을 가져와서 Gmin stepping에 사용
+	currentSolution := mat.Solution()
+
 	for i := 0; i <= numGminSteps; i++ {
-		err := op.doNRiter(gmin, op.convergence.maxIter)
+		err := op.doNRiter(gmin, op.convergence.maxIter, currentSolution)
 		if err != nil {
 			break
 		}
+		currentSolution = mat.Solution() // 다음 반복에 사용할 솔루션 업데이트
 		gmin /= 10
 	}
 
-	err = op.doNRiter(0, op.convergence.maxIter)
+	err = op.doNRiter(0, op.convergence.maxIter, currentSolution)
 	if err == nil {
 		solution := mat.Solution()
 		op.storeResults(solution)
@@ -244,7 +219,9 @@ func (op *OperatingPoint) Execute() error {
 		return fmt.Errorf("source stepping failed: %v", err)
 	}
 
-	err = op.doNRiter(0, op.convergence.maxIter)
+	// Source stepping 후의 솔루션으로 최종 시도
+	finalSolution := mat.Solution()
+	err = op.doNRiter(0, op.convergence.maxIter, finalSolution)
 	if err != nil {
 		return fmt.Errorf("final solution failed: %v", err)
 	}
