@@ -35,6 +35,12 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 		Gmin: gmin,
 	}
 
+	// initialVoltages := make([]float64, mat.Size+1)
+	// for i := range initialVoltages {
+	// 	initialVoltages[i] = 0.0
+	// }
+	// ckt.UpdateNonlinearVoltages(initialVoltages)
+
 	for iter := range maxIter {
 		mat.Clear()
 
@@ -54,7 +60,6 @@ func (op *OperatingPoint) doNRiter(gmin float64, maxIter int) error {
 
 		err = mat.Solve()
 		if err != nil {
-			mat.PrintSystem()
 			return fmt.Errorf("matrix solve error: %v", err)
 		}
 
@@ -94,6 +99,7 @@ func (op *OperatingPoint) calculateInitialEstimate() []float64 {
 
 	for _, dev := range ckt.GetDevices() {
 		if _, isNonlinear := dev.(device.NonLinear); !isNonlinear {
+			fmt.Println("linear device:", dev.GetName())
 			dev.Stamp(initialMatrix, ckt.Status)
 		}
 	}
@@ -104,7 +110,10 @@ func (op *OperatingPoint) calculateInitialEstimate() []float64 {
 		return nil
 	}
 
-	return initialMatrix.Solution()
+	result := initialMatrix.Solution()
+	fmt.Println("initial solution:", result)
+
+	return result
 }
 
 func (op *OperatingPoint) performSourceStepping() error {
@@ -155,7 +164,7 @@ func (op *OperatingPoint) performSourceStepping() error {
 	return nil
 }
 
-func (op *OperatingPoint) Execute() error {
+func (op *OperatingPoint) ExecuteNotUse() error {
 	ckt := op.Circuit
 	mat := ckt.GetMatrix()
 
@@ -190,7 +199,7 @@ func (op *OperatingPoint) Execute() error {
 	return nil
 }
 
-func (op *OperatingPoint) ExecuteNotUse() error {
+func (op *OperatingPoint) Execute() error {
 	ckt := op.Circuit
 	mat := ckt.GetMatrix()
 

@@ -116,7 +116,7 @@ func (b *Bjt) calculateInitialOperatingPoint(temp float64) {
 
 	b.vbc = b.vbe - b.vce
 
-	// fmt.Println("temp, vt, vbe, vce, vbc", temp, vt, b.vbe, b.vce, b.vbc)
+	fmt.Println("temp, vt, vbe, vce, vbc", temp, vt, b.vbe, b.vce, b.vbc)
 }
 
 func (b *Bjt) thermalVoltage(temp float64) float64 {
@@ -271,7 +271,13 @@ func (b *Bjt) calculateConductances(temp float64) {
 		b.gpi = 1e-12
 	}
 
-	b.gout = 1e-12
+	if b.Vaf != 0 {
+		b.gout = b.AlphaF * b.Ies * (expVbe - 1) * (1 / b.Vaf) * math.Pow(1+b.vce/b.Vaf, -2)
+	} else {
+		b.gout = 1e-12
+	}
+
+	// fmt.Println("b.vbe, b.Nf, vt, expVbe, dIes_dVbe, gm, gpi, gout", b.vbe, b.Nf, vt, expVbe, dIes_dVbe, b.gm, b.gpi, b.gout)
 }
 
 func (b *Bjt) UpdateVoltages(voltages []float64) error {
@@ -286,7 +292,7 @@ func (b *Bjt) UpdateVoltages(voltages []float64) error {
 		ve = voltages[b.Nodes[2]]
 	}
 
-	// fmt.Printf("Node voltages: Vc=%.3f, Vb=%.3f, Ve=%.3f\n", vc, vb, ve)
+	fmt.Printf("Node voltages: Vc=%.12f, Vb=%.12f, Ve=%.12f\n", vc, vb, ve)
 
 	if b.Type == "PNP" {
 		b.vbe = ve - vb
@@ -297,8 +303,11 @@ func (b *Bjt) UpdateVoltages(voltages []float64) error {
 		b.vbc = vb - vc
 		b.vce = vc - ve
 	}
+	// b.vbe = ve - vb
+	// b.vbc = vc - vb
+	// b.vce = ve - vc
 
-	// fmt.Printf("Calculated voltages: VBE=%.3f, VBC=%.3f, VCE=%.3f\n", b.vbe, b.vbc, b.vce)
+	// fmt.Printf("Calculated voltages: Type: %s, VBE=%.12f, VBC=%.12f, VCE=%.12f\n", b.Type, b.vbe, b.vbc, b.vce)
 
 	return nil
 }
@@ -327,10 +336,10 @@ func (b *Bjt) Stamp(matrix matrix.DeviceMatrix, status *CircuitStatus) error {
 
 	// fmt.Printf("After calculation: VBE=%.3f, VCE=%.3f\n", b.vbe, b.vce)
 
-	gmin := status.Gmin
-	b.gpi += gmin
-	b.gm += gmin
-	b.gout += gmin
+	// gmin := status.Gmin
+	// b.gpi += gmin
+	// b.gm += gmin
+	// b.gout += gmin
 
 	// Collector
 	if nc != 0 {

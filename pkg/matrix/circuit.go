@@ -126,7 +126,12 @@ func (m *CircuitMatrix) Clear() {
 func (m *CircuitMatrix) Solve() error {
 	var err error
 
-	err = m.matrix.Factor()
+	if m.config.Complex {
+		err = m.matrix.FactorComplex()
+	} else {
+		err = m.matrix.Factor()
+	}
+
 	if err != nil {
 		return fmt.Errorf("matrix factorization failed: %v", err)
 	}
